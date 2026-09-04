@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <?!= include('ui/CSS_Styles'); ?>
+</head>
+<body>
+  <div id="app">
+    <div id="sidebar">
+      <div class="brand">
+        <div class="name">EUREKA 2027</div>
+        <div class="tag">Strategy. Transformation. Operational Excellence.</div>
+      </div>
+      <nav id="nav-list"></nav>
+      <div class="foot">CEO Execution System<br>v1.0</div>
+    </div>
+    <div id="main">
+      <div id="topbar">
+        <div>
+          <h1 id="page-title">Dashboard</h1>
+          <div class="sub" id="page-sub">Eureka Healthcare Development Experts — 2027 Growth Strategy</div>
+        </div>
+        <div id="filters"></div>
+      </div>
+      <div id="content"><div class="loading">Loading Eureka 2027…</div></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <?!= include('ui/JS_Core'); ?>
+  <?!= include('ui/JS_Views'); ?>
+  <?!= include('ui/JS_Forms'); ?>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () { App.init(); });
+  </script>
+</body>
+</html>

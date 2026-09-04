@@ -1,0 +1,339 @@
+<script>
+/** CRUD modal forms. Each opens a modal built from a field-definition list, then posts to the matching api_save* function. */
+App.Forms = {};
+
+function buildForm(fields, record) {
+  record = record || {};
+  return '<div class="form-grid">' + fields.map(function (f) {
+    return App.field(f.key, f.label, f.type, f.options, record[f.key], f.full);
+  }).join('') + '</div>';
+}
+
+function collect(fields) {
+  var out = {};
+  fields.forEach(function (f) {
+    var el = document.getElementById('f_' + f.key);
+    if (!el) return;
+    if (f.type === 'checkbox') out[f.key] = el.checked;
+    else if (f.type === 'percentInput') out[f.key] = (Number(el.value) || 0) / 100;
+    else if (f.type === 'number') out[f.key] = Number(el.value) || 0;
+    else out[f.key] = el.value;
+  });
+  return out;
+}
+
+function lk(key) { return (App.state.lookups && App.state.lookups[key]) || []; }
+
+// ---- Tasks ----
+App.Forms.openTaskForm = function (record, defaultWeekId) {
+  var fields = [
+    { key: 'weekId', label: 'Week', type: 'select', options: lk('weeks').map(function (w) { return { value: w.weekId, label: w.label }; }) },
+    { key: 'task', label: 'Task', full: true },
+    { key: 'taskCategory', label: 'Category', type: 'select', options: lk('taskCategories') },
+    { key: 'taskDescription', label: 'Description', type: 'textarea', full: true },
+    { key: 'expectedDeliverable', label: 'Expected Deliverable', full: true },
+    { key: 'taskOwner', label: 'Owner', type: 'select', options: lk('team') },
+    { key: 'supportingTeam', label: 'Supporting Team' },
+    { key: 'priority', label: 'Priority', type: 'select', options: lk('taskPriority') },
+    { key: 'status', label: 'Status', type: 'select', options: lk('taskStatus') },
+    { key: 'startDate', label: 'Start Date', type: 'date' },
+    { key: 'dueDate', label: 'Due Date', type: 'date' },
+    { key: 'completionDate', label: 'Completion Date', type: 'date' },
+    { key: 'percentCompletion', label: '% Completion (0-100)', type: 'percentInput' },
+    { key: 'dependency', label: 'Dependency' },
+    { key: 'blocker', label: 'Blocker' },
+    { key: 'ceoAttentionRequired', label: 'CEO Attention Required?', type: 'checkbox' },
+    { key: 'notes', label: 'Notes', type: 'textarea', full: true }
+  ];
+  var rec = record || { weekId: defaultWeekId };
+  App.openModal(record ? 'Edit Task' : 'Add Task', buildForm(fields, rec), function () {
+    var data = collect(fields);
+    if (record) data.taskId = record.taskId;
+    App.call('api_saveTask', data).then(function (res) {
+      App.closeModal();
+      if (res.ok) { App.toast('Task saved.'); App.navigate(App.state.currentView); } else App.toast(res.error, true);
+    });
+  });
+};
+
+// ---- Pipeline / CRM ----
+App.Forms.openPipelineForm = function (record) {
+  var fields = [
+    { key: 'organization', label: 'Organization', full: true },
+    { key: 'country', label: 'Country', type: 'select', options: lk('countries') },
+    { key: 'city', label: 'City' },
+    { key: 'market', label: 'Market', type: 'select', options: lk('markets') },
+    { key: 'organizationType', label: 'Organization Type' },
+    { key: 'decisionMaker', label: 'Decision Maker' },
+    { key: 'decisionMakerTitle', label: 'Title' },
+    { key: 'phone', label: 'Phone' },
+    { key: 'email', label: 'Email' },
+    { key: 'linkedin', label: 'LinkedIn' },
+    { key: 'leadSource', label: 'Lead Source' },
+    { key: 'bdOwner', label: 'BD Owner', type: 'select', options: lk('team') },
+    { key: 'businessUnit', label: 'Business Unit', type: 'select', options: lk('businessUnits') },
+    { key: 'potentialService', label: 'Potential Service' },
+    { key: 'estimatedOpportunityValue', label: 'Estimated Value (EGP)', type: 'number' },
+    { key: 'stage', label: 'Stage', type: 'select', options: lk('salesStages').map(function (s) { return { value: s.name, label: s.name + ' (' + Math.round(s.probability * 100) + '%)' }; }) },
+    { key: 'firstContactDate', label: 'First Contact', type: 'date' },
+    { key: 'lastContactDate', label: 'Last Contact', type: 'date' },
+    { key: 'nextAction', label: 'Next Action', full: true },
+    { key: 'nextActionDate', label: 'Next Action Date', type: 'date' },
+    { key: 'expectedCloseDate', label: 'Expected Close', type: 'date' },
+    { key: 'competitor', label: 'Competitor' },
+    { key: 'lostReason', label: 'Lost Reason' },
+    { key: 'notes', label: 'Notes', type: 'textarea', full: true }
+  ];
+  App.openModal(record ? 'Edit Opportunity' : 'Add Opportunity', buildForm(fields, record), function () {
+    var data = collect(fields);
+    if (record) data.opportunityId = record.opportunityId;
+    App.call('api_savePipeline', data).then(function (res) {
+      App.closeModal();
+      if (res.ok) { App.toast('Opportunity saved.'); App.navigate('crm'); } else App.toast(res.error, true);
+    });
+  });
+};
+
+// ---- Revenue ----
+App.Forms.openRevenueForm = function (record) {
+  var fields = [
+    { key: 'client', label: 'Client', full: true },
+    { key: 'project', label: 'Project' },
+    { key: 'contractNumber', label: 'Contract Number' },
+    { key: 'country', label: 'Country', type: 'select', options: lk('countries') },
+    { key: 'city', label: 'City' },
+    { key: 'market', label: 'Market', type: 'select', options: lk('markets') },
+    { key: 'businessUnit', label: 'Business Unit', type: 'select', options: lk('businessUnits') },
+    { key: 'service', label: 'Service' },
+    { key: 'bdOwner', label: 'BD Owner', type: 'select', options: lk('team') },
+    { key: 'contractValue', label: 'Contract Value', type: 'number' },
+    { key: 'contractSigningDate', label: 'Contract Signing Date', type: 'date' },
+    { key: 'projectStart', label: 'Project Start', type: 'date' },
+    { key: 'projectEnd', label: 'Project End', type: 'date' },
+    { key: 'invoiceAmount', label: 'Invoice Amount', type: 'number' },
+    { key: 'invoiceDate', label: 'Invoice Date', type: 'date' },
+    { key: 'dueDate', label: 'Due Date', type: 'date' },
+    { key: 'amountCollected', label: 'Amount Collected', type: 'number' },
+    { key: 'collectionDate', label: 'Collection Date', type: 'date' },
+    { key: 'revenueRecognized', label: 'Revenue Recognized', type: 'number' },
+    { key: 'paymentStatus', label: 'Payment Status', type: 'select', options: lk('paymentStatus') },
+    { key: 'collectionStatus', label: 'Collection Status', type: 'select', options: lk('collectionStatus') },
+    { key: 'notes', label: 'Notes', type: 'textarea', full: true }
+  ];
+  App.openModal(record ? 'Edit Revenue Record' : 'Add Revenue Record', buildForm(fields, record), function () {
+    var data = collect(fields);
+    if (record) data.revenueId = record.revenueId;
+    App.call('api_saveRevenue', data).then(function (res) {
+      App.closeModal();
+      if (res.ok) { App.toast('Revenue record saved.'); App.navigate('revenue'); } else App.toast(res.error, true);
+    });
+  });
+};
+
+// ---- Expenses ----
+App.Forms.openExpenseForm = function (record) {
+  var fields = [
+    { key: 'date', label: 'Date', type: 'date' },
+    { key: 'market', label: 'Market', type: 'select', options: lk('markets') },
+    { key: 'country', label: 'Country', type: 'select', options: lk('countries') },
+    { key: 'city', label: 'City' },
+    { key: 'campaign', label: 'Campaign', type: 'select', options: lk('campaigns') },
+    { key: 'event', label: 'Event', type: 'select', options: lk('events') },
+    { key: 'businessUnit', label: 'Business Unit', type: 'select', options: lk('businessUnits') },
+    { key: 'expenseCategory', label: 'Category', type: 'select', options: lk('expenseCategories') },
+    { key: 'expenseDescription', label: 'Description', full: true },
+    { key: 'vendor', label: 'Vendor' },
+    { key: 'budgetedAmount', label: 'Budgeted Amount', type: 'number' },
+    { key: 'actualAmount', label: 'Actual Amount', type: 'number' },
+    { key: 'paymentStatus', label: 'Payment Status', type: 'select', options: lk('paymentStatus') },
+    { key: 'paymentMethod', label: 'Payment Method', type: 'select', options: lk('paymentMethods') },
+    { key: 'invoiceNumber', label: 'Invoice Number' },
+    { key: 'responsiblePerson', label: 'Responsible Person', type: 'select', options: lk('team') },
+    { key: 'approvedBy', label: 'Approved By', type: 'select', options: lk('team') },
+    { key: 'notes', label: 'Notes', type: 'textarea', full: true }
+  ];
+  App.openModal(record ? 'Edit Expense' : 'Add Expense', buildForm(fields, record), function () {
+    var data = collect(fields);
+    if (record) data.expenseId = record.expenseId;
+    App.call('api_saveExpense', data).then(function (res) {
+      App.closeModal();
+      if (res.ok) { App.toast('Expense saved.'); App.navigate('expenses'); } else App.toast(res.error, true);
+    });
+  });
+};
+
+// ---- Campaigns ----
+App.Forms.openCampaignForm = function (record) {
+  var fields = [
+    { key: 'campaign', label: 'Campaign', full: true },
+    { key: 'market', label: 'Market', type: 'select', options: lk('markets') },
+    { key: 'country', label: 'Country', type: 'select', options: lk('countries') },
+    { key: 'start', label: 'Start', type: 'date' },
+    { key: 'end', label: 'End', type: 'date' },
+    { key: 'businessObjective', label: 'Business Objective', full: true },
+    { key: 'targetAudience', label: 'Target Audience' },
+    { key: 'coreMessage', label: 'Core Message' },
+    { key: 'product', label: 'Product' },
+    { key: 'channel', label: 'Channel', type: 'select', options: lk('campaignTypes') },
+    { key: 'budget', label: 'Budget', type: 'number' },
+    { key: 'actualSpend', label: 'Actual Spend', type: 'number' },
+    { key: 'leads', label: 'Leads', type: 'number' },
+    { key: 'qualifiedLeads', label: 'Qualified Leads', type: 'number' },
+    { key: 'meetings', label: 'Meetings', type: 'number' },
+    { key: 'proposals', label: 'Proposals', type: 'number' },
+    { key: 'wins', label: 'Wins', type: 'number' },
+    { key: 'revenueInfluenced', label: 'Revenue Influenced', type: 'number' },
+    { key: 'pipelineInfluenced', label: 'Pipeline Influenced', type: 'number' },
+    { key: 'owner', label: 'Owner', type: 'select', options: lk('team') },
+    { key: 'status', label: 'Status' },
+    { key: 'lessonsLearned', label: 'Lessons Learned', type: 'textarea', full: true }
+  ];
+  App.openModal(record ? 'Edit Campaign' : 'Add Campaign', buildForm(fields, record), function () {
+    var data = collect(fields);
+    if (record) data.campaignId = record.campaignId;
+    App.call('api_saveCampaign', data).then(function (res) {
+      App.closeModal();
+      if (res.ok) { App.toast('Campaign saved.'); App.navigate('campaigns'); } else App.toast(res.error, true);
+    });
+  });
+};
+
+// ---- Events ----
+App.Forms.openEventForm = function (record) {
+  var fields = [
+    { key: 'eventName', label: 'Event Name', full: true },
+    { key: 'country', label: 'Country', type: 'select', options: lk('countries') },
+    { key: 'city', label: 'City' },
+    { key: 'date', label: 'Date', type: 'date' },
+    { key: 'eventType', label: 'Event Type', type: 'select', options: lk('eventTypes') },
+    { key: 'targetAudience', label: 'Target Audience' },
+    { key: 'targetAttendees', label: 'Target Attendees', type: 'number' },
+    { key: 'actualAttendees', label: 'Actual Attendees', type: 'number' },
+    { key: 'budget', label: 'Budget', type: 'number' },
+    { key: 'actualCost', label: 'Actual Cost', type: 'number' },
+    { key: 'meetingsGenerated', label: 'Meetings Generated', type: 'number' },
+    { key: 'qualifiedLeads', label: 'Qualified Leads', type: 'number' },
+    { key: 'opportunities', label: 'Opportunities', type: 'number' },
+    { key: 'pipelineGenerated', label: 'Pipeline Generated', type: 'number' },
+    { key: 'proposalsGenerated', label: 'Proposals Generated', type: 'number' },
+    { key: 'contractsWon', label: 'Contracts Won', type: 'number' },
+    { key: 'revenueGenerated', label: 'Revenue Generated', type: 'number' },
+    { key: 'owner', label: 'Owner', type: 'select', options: lk('team') },
+    { key: 'followUpCompletionPct', label: 'Follow-Up Completion (0-100)', type: 'percentInput' },
+    { key: 'notes', label: 'Notes', type: 'textarea', full: true }
+  ];
+  App.openModal(record ? 'Edit Event' : 'Add Event', buildForm(fields, record), function () {
+    var data = collect(fields);
+    if (record) data.eventId = record.eventId;
+    App.call('api_saveEvent', data).then(function (res) {
+      App.closeModal();
+      if (res.ok) { App.toast('Event saved.'); App.navigate('events'); } else App.toast(res.error, true);
+    });
+  });
+};
+
+// ---- Generic form (Projects, Academy, Partnerships, Target Accounts, Case Studies, Digital Roadmap, Decisions, Risks, Clients, Team, Markets, Business Units) ----
+// Built by a function (not a plain object literal) because lk() must read App.state.lookups
+// at the moment a form is opened, not at script-load time when lookups have not arrived yet.
+function buildGenericFieldDefs() {
+return {
+  '17_Projects': [
+    { key: 'projectName', label: 'Project Name', full: true }, { key: 'clientId', label: 'Client ID' }, { key: 'revenueId', label: 'Revenue ID' },
+    { key: 'businessUnit', label: 'Business Unit', type: 'select', options: lk('businessUnits') }, { key: 'service', label: 'Service' },
+    { key: 'country', label: 'Country', type: 'select', options: lk('countries') }, { key: 'market', label: 'Market', type: 'select', options: lk('markets') },
+    { key: 'pmoOwner', label: 'PMO Owner', type: 'select', options: lk('team') }, { key: 'startDate', label: 'Start Date', type: 'date' }, { key: 'endDate', label: 'End Date', type: 'date' },
+    { key: 'status', label: 'Status' }, { key: 'percentComplete', label: '% Complete (0-100)', type: 'percentInput' },
+    { key: 'grossMargin', label: 'Gross Margin % (0-100)', type: 'percentInput' }, { key: 'consultantUtilization', label: 'Utilization % (0-100)', type: 'percentInput' },
+    { key: 'nps', label: 'NPS', type: 'number' }, { key: 'scopeCreep', label: 'Scope Creep Case?', type: 'checkbox' }, { key: 'notes', label: 'Notes', type: 'textarea', full: true }
+  ],
+  '19_Academy': [
+    { key: 'program', label: 'Program', full: true }, { key: 'country', label: 'Country', type: 'select', options: lk('countries') },
+    { key: 'audience', label: 'Audience' }, { key: 'client', label: 'Client' }, { key: 'programType', label: 'Program Type' },
+    { key: 'datesStart', label: 'Start Date', type: 'date' }, { key: 'datesEnd', label: 'End Date', type: 'date' },
+    { key: 'participants', label: 'Participants', type: 'number' }, { key: 'price', label: 'Price', type: 'number' },
+    { key: 'revenue', label: 'Revenue', type: 'number' }, { key: 'cost', label: 'Cost', type: 'number' },
+    { key: 'leadSource', label: 'Lead Source' }, { key: 'upsellOpportunity', label: 'Upsell Opportunity' }, { key: 'nps', label: 'NPS', type: 'number' }
+  ],
+  '18_Partnerships': [
+    { key: 'partner', label: 'Partner', full: true }, { key: 'country', label: 'Country', type: 'select', options: lk('countries') },
+    { key: 'company', label: 'Company' }, { key: 'contact', label: 'Contact' }, { key: 'strategicValue', label: 'Strategic Value', full: true },
+    { key: 'marketAccess', label: 'Market Access' }, { key: 'healthcareAccess', label: 'Healthcare Access' }, { key: 'governmentAccess', label: 'Government Access' },
+    { key: 'commercialTerms', label: 'Commercial Terms' }, { key: 'commission', label: 'Commission % (0-100)', type: 'percentInput' },
+    { key: 'exclusivity', label: 'Exclusivity' }, { key: 'agreementStart', label: 'Agreement Start', type: 'date' }, { key: 'agreementEnd', label: 'Agreement End', type: 'date' },
+    { key: 'opportunitiesGenerated', label: 'Opportunities Generated', type: 'number' }, { key: 'revenueGenerated', label: 'Revenue Generated', type: 'number' },
+    { key: 'performance', label: 'Performance' }, { key: 'status', label: 'Status' }
+  ],
+  '09_Target_Accounts': [
+    { key: 'organization', label: 'Organization', full: true }, { key: 'country', label: 'Country', type: 'select', options: lk('countries') }, { key: 'city', label: 'City' },
+    { key: 'type', label: 'Type' }, { key: 'specialty', label: 'Specialty' }, { key: 'website', label: 'Website' }, { key: 'ownerGroup', label: 'Owner / Group' },
+    { key: 'ceo', label: 'CEO' }, { key: 'coo', label: 'COO' }, { key: 'medicalDirector', label: 'Medical Director' }, { key: 'qualityDirector', label: 'Quality Director' },
+    { key: 'hrDirector', label: 'HR Director' }, { key: 'strategyDirector', label: 'Strategy Director' }, { key: 'investmentDirector', label: 'Investment Director' },
+    { key: 'contactInformation', label: 'Contact Information', full: true }, { key: 'accreditationStatus', label: 'Accreditation Status' }, { key: 'expansionStatus', label: 'Expansion Status' },
+    { key: 'potentialNeed', label: 'Potential Need' }, { key: 'priorityTier', label: 'Priority Tier', type: 'select', options: lk('accountTiers') },
+    { key: 'estimatedOpportunity', label: 'Estimated Opportunity', type: 'number' }, { key: 'assignedBD', label: 'Assigned BD', type: 'select', options: lk('team') },
+    { key: 'lastContact', label: 'Last Contact', type: 'date' }, { key: 'nextAction', label: 'Next Action', full: true }, { key: 'notes', label: 'Notes', type: 'textarea', full: true }
+  ],
+  '20_Case_Studies': [
+    { key: 'caseStudy', label: 'Case Study', full: true }, { key: 'client', label: 'Client' }, { key: 'sector', label: 'Sector' },
+    { key: 'problem', label: 'Problem', type: 'textarea', full: true }, { key: 'intervention', label: 'Intervention', type: 'textarea', full: true },
+    { key: 'results', label: 'Results', type: 'textarea', full: true }, { key: 'metrics', label: 'Metrics' }, { key: 'accreditation', label: 'Accreditation' },
+    { key: 'testimonial', label: 'Testimonial', type: 'textarea', full: true },
+    { key: 'pdfReady', label: 'PDF Ready', type: 'checkbox' }, { key: 'websiteReady', label: 'Website Ready', type: 'checkbox' },
+    { key: 'linkedinReady', label: 'LinkedIn Ready', type: 'checkbox' }, { key: 'videoReady', label: 'Video Ready', type: 'checkbox' },
+    { key: 'salesDeckReady', label: 'Sales Deck Ready', type: 'checkbox' }, { key: 'owner', label: 'Owner', type: 'select', options: lk('team') }
+  ],
+  '21_Digital_Roadmap': [
+    { key: 'feature', label: 'Feature', full: true }, { key: 'phase', label: 'Phase' }, { key: 'owner', label: 'Owner', type: 'select', options: lk('team') },
+    { key: 'start', label: 'Start', type: 'date' }, { key: 'deadline', label: 'Deadline', type: 'date' }, { key: 'status', label: 'Status', type: 'select', options: lk('taskStatus') },
+    { key: 'cost', label: 'Cost', type: 'number' }, { key: 'testing', label: 'Testing' }, { key: 'clientFeedback', label: 'Client Feedback' },
+    { key: 'priority', label: 'Priority', type: 'select', options: lk('taskPriority') }, { key: 'notes', label: 'Notes', type: 'textarea', full: true }
+  ],
+  '25_Decisions': [
+    { key: 'date', label: 'Date', type: 'date' }, { key: 'meeting', label: 'Meeting' }, { key: 'issue', label: 'Issue', full: true },
+    { key: 'decision', label: 'Decision', type: 'textarea', full: true }, { key: 'ceoDecision', label: 'CEO Decision?', type: 'checkbox' },
+    { key: 'decisionOwner', label: 'Decision Owner', type: 'select', options: lk('team') }, { key: 'deadline', label: 'Deadline', type: 'date' },
+    { key: 'status', label: 'Status', type: 'select', options: lk('decisionStatus') }, { key: 'impact', label: 'Impact' }, { key: 'notes', label: 'Notes', type: 'textarea', full: true }
+  ],
+  '24_Risks': [
+    { key: 'risk', label: 'Risk', full: true }, { key: 'category', label: 'Category', type: 'select', options: lk('riskCategories') },
+    { key: 'market', label: 'Market', type: 'select', options: lk('markets') }, { key: 'project', label: 'Project' },
+    { key: 'probability', label: 'Probability (1-5)', type: 'number' }, { key: 'impact', label: 'Impact (1-5)', type: 'number' },
+    { key: 'mitigation', label: 'Mitigation', type: 'textarea', full: true }, { key: 'owner', label: 'Owner', type: 'select', options: lk('team') },
+    { key: 'dueDate', label: 'Due Date', type: 'date' }, { key: 'status', label: 'Status', type: 'select', options: lk('riskStatus') }
+  ],
+  '16_Clients': [
+    { key: 'clientName', label: 'Client Name', full: true }, { key: 'country', label: 'Country', type: 'select', options: lk('countries') }, { key: 'city', label: 'City' },
+    { key: 'market', label: 'Market', type: 'select', options: lk('markets') }, { key: 'sector', label: 'Sector' }, { key: 'primaryContact', label: 'Primary Contact' },
+    { key: 'title', label: 'Title' }, { key: 'phone', label: 'Phone' }, { key: 'email', label: 'Email' },
+    { key: 'relationshipOwner', label: 'Relationship Owner', type: 'select', options: lk('team') }, { key: 'clientSince', label: 'Client Since', type: 'date' },
+    { key: 'status', label: 'Status' }, { key: 'notes', label: 'Notes', type: 'textarea', full: true }
+  ],
+  '15_Team': [
+    { key: 'name', label: 'Name', full: true }, { key: 'email', label: 'Email' }, { key: 'role', label: 'Role' },
+    { key: 'responsibilities', label: 'Responsibilities', type: 'textarea', full: true }, { key: 'marketsOwned', label: 'Markets Owned' }, { key: 'active', label: 'Active', type: 'checkbox' }
+  ],
+  '13_Markets': [
+    { key: 'market', label: 'Market', full: true }, { key: 'country', label: 'Country', type: 'select', options: lk('countries') },
+    { key: 'revenueTarget2027', label: 'Revenue Target 2027', type: 'number' }, { key: 'owner', label: 'Owner', type: 'select', options: lk('team') },
+    { key: 'status', label: 'Status' }, { key: 'launchMonth', label: 'Launch Month' }, { key: 'notes', label: 'Notes', type: 'textarea', full: true }
+  ],
+  '14_Business_Units': [
+    { key: 'businessUnit', label: 'Business Unit', full: true }, { key: 'service', label: 'Service' }, { key: 'description', label: 'Description', type: 'textarea', full: true }
+  ]
+};
+}
+
+App.Forms.openGenericForm = function (sheetName, idKey, record, label, onSaved) {
+  var fields = buildGenericFieldDefs()[sheetName];
+  if (!fields) { App.toast('No form defined for ' + sheetName, true); return; }
+  App.openModal((record ? 'Edit ' : 'Add ') + label, buildForm(fields, record), function () {
+    var data = collect(fields);
+    if (record) data[idKey] = record[idKey];
+    App.call('api_saveGenericRecord', sheetName, data).then(function (res) {
+      App.closeModal();
+      if (res.ok) { App.toast(label + ' saved.'); if (onSaved) onSaved(); else App.navigate(App.state.currentView); }
+      else App.toast(res.error, true);
+    });
+  });
+};
+</script>

@@ -1,0 +1,598 @@
+<script>
+/** All top-level views. Each function fetches data via App.call() then paints App.setContent(). */
+
+App.Views.dashboard = function () {
+  App.call('api_getDashboard').then(function (res) {
+    if (!res.ok) return App.showError(res.error);
+    var d = res.data;
+    var h = d.headline;
+    var alertsHtml = renderAlerts(d.alerts);
+    var progressToTargets = ['min', 'target', 'stretch'].map(function (k) {
+      var val = d.targets[k];
+      var pct = val ? h.revenueActual / val : 0;
+      var label = k === 'min' ? 'Minimum (10M)' : (k === 'target' ? 'Operating Target (12.7M)' : 'Stretch (15M)');
+      return '<div style="margin-bottom:10px">' + App.progressBar(pct, label + ' — ' + App.fmtMoney(val)) + '</div>';
+    }).join('');
+
+    App.setContent(
+      '<div class="kpi-grid">' +
+        kpiTile('Revenue Actual', App.fmtMoney(h.revenueActual), App.fmtPct(h.revenueAchievementPct) + ' of ' + App.fmtMoney(h.revenueTarget)) +
+        kpiTile('Sales Bookings', App.fmtMoney(h.bookingsActual), 'Target ' + App.fmtMoney(h.bookingsTarget)) +
+        kpiTile('Cash Collected', App.fmtMoney(h.cashCollected), 'Outstanding ' + App.fmtMoney(h.outstandingReceivables)) +
+        kpiTile('Growth Spend', App.fmtMoney(h.actualGrowthSpend), 'Budget ' + App.fmtMoney(h.growthBudget) + ' · Var ' + App.fmtMoney(h.budgetVariance)) +
+        kpiTile('Total Pipeline', App.fmtMoney(h.totalPipeline), 'Weighted ' + App.fmtMoney(h.weightedPipeline)) +
+        kpiTile('Pipeline Coverage', h.pipelineCoverage.toFixed(1) + 'x', 'Target ~3.0x, floor 2.5x') +
+        kpiTile('Win Rate', App.fmtPct(h.winRate), h.dealsWon + ' deals won') +
+        kpiTile('Tasks Completion', App.fmtPct(h.tasksCompletionPct), 'All active weeks') +
+      '</div>' +
+      '<div class="grid-2">' +
+        '<div class="card"><h3>Path to 2027 Revenue Scenarios</h3>' + progressToTargets + '</div>' +
+        '<div class="card"><h3>Alerts</h3>' + alertsHtml + '</div>' +
+      '</div>' +
+      '<div class="grid-2">' +
+        '<div class="card"><h3>Revenue: Target vs Actual by Month</h3><div style="height:260px"><canvas id="chartRevMonth"></canvas></div></div>' +
+        '<div class="card"><h3>Bookings: Target vs Actual by Month</h3><div style="height:260px"><canvas id="chartBookMonth"></canvas></div></div>' +
+      '</div>' +
+      '<div class="grid-2">' +
+        '<div class="card"><h3>Revenue by Market (Target vs Actual)</h3><div style="height:260px"><canvas id="chartRevMarket"></canvas></div></div>' +
+        '<div class="card"><h3>Revenue by Business Unit</h3><div style="height:260px"><canvas id="chartRevBU"></canvas></div></div>' +
+      '</div>' +
+      '<div class="grid-2">' +
+        '<div class="card"><h3>Pipeline by Sales Stage</h3><div style="height:260px"><canvas id="chartPipeStage"></canvas></div></div>' +
+        '<div class="card"><h3>Budget vs Actual Spend by Month</h3><div style="height:260px"><canvas id="chartBudget"></canvas></div></div>' +
+      '</div>'
+    );
+
+    var c = d.charts;
+    App.barLineChart('chartRevMonth', c.revenueByMonth.map(function (m) { return m.month.slice(0, 3); }), [
+      { label: 'Target', data: c.revenueByMonth.map(function (m) { return m.revenueTarget; }), backgroundColor: '#cfd8e8' },
+      { label: 'Actual', data: c.revenueByMonth.map(function (m) { return m.revenueActual; }), backgroundColor: '#1a2b4c' }
+    ]);
+    App.barLineChart('chartBookMonth', c.revenueByMonth.map(function (m) { return m.month.slice(0, 3); }), [
+      { label: 'Target', data: c.revenueByMonth.map(function (m) { return m.bookingsTarget; }), backgroundColor: '#eadfc0' },
+      { label: 'Actual', data: c.revenueByMonth.map(function (m) { return m.bookingsActual; }), backgroundColor: '#c9a24b' }
+    ]);
+    App.barLineChart('chartRevMarket', c.revenueByMarket.map(function (m) { return m.market; }), [
+      { label: 'Target', data: c.revenueByMarket.map(function (m) { return m.target; }), backgroundColor: '#cfd8e8' },
+      { label: 'Actual', data: c.revenueByMarket.map(function (m) { return m.actual; }), backgroundColor: '#1a7f4e' }
+    ]);
+    App.pieChart('chartRevBU', c.revenueByBusinessUnit.map(function (m) { return m.businessUnit; }), c.revenueByBusinessUnit.map(function (m) { return m.actual; }));
+    App.pieChart('chartPipeStage', c.pipelineByStage.map(function (m) { return m.stage; }), c.pipelineByStage.map(function (m) { return m.value; }));
+    App.barLineChart('chartBudget', c.revenueByMonth.map(function (m) { return m.month.slice(0, 3); }), [
+      { label: 'Budget', data: c.revenueByMonth.map(function (m) { return m.budget; }), backgroundColor: '#eadfc0' },
+      { label: 'Actual Spend', data: c.revenueByMonth.map(function (m) { return m.actualSpend; }), backgroundColor: '#b3261e' }
+    ]);
+  });
+};
+
+function kpiTile(label, value, sub) {
+  return '<div class="kpi-card"><div class="label">' + label + '</div><div class="value">' + value + '</div><div class="sub">' + sub + '</div></div>';
+}
+
+function renderAlerts(alerts) {
+  if (!alerts || !alerts.length) return '<div class="empty-state">No active alerts. All metrics within threshold.</div>';
+  return alerts.slice(0, 12).map(function (a) {
+    return '<div class="alert-item"><span class="dot">' + App.light(a.level) + '</span><div><span class="area">' + App.esc(a.area) + ':</span>' + App.esc(a.message) + '</div></div>';
+  }).join('');
+}
+
+// ---------------------------------------------------------------- Weekly Execution
+App.Views.weekly = function () {
+  App.call('api_getLookups').then(function (lk) {
+    var weeks = lk.ok ? lk.data.weeks : [];
+    App.setFilters('<select id="weekPicker">' + weeks.map(function (w) { return '<option value="' + w.weekId + '">' + w.label + '</option>'; }).join('') + '</select>');
+    var current = weeks[0] ? weeks[0].weekId : null;
+    document.getElementById('weekPicker').onchange = function (e) { loadWeek(e.target.value); };
+    loadWeek(null);
+  });
+
+  function loadWeek(weekId) {
+    App.call('api_getWeeklyReview', weekId).then(function (res) {
+      if (!res.ok || !res.data) return App.showError(res.error || 'No week data.');
+      var w = res.data.week;
+      document.getElementById('weekPicker') && (document.getElementById('weekPicker').value = w.weekId);
+      App.call('api_getTasks', { weekId: w.weekId }).then(function (tres) {
+        var tasks = tres.ok ? tres.data : [];
+        App.setContent(
+          '<div class="card"><h3>' + w.weekId + ' — ' + App.fmtDate(w.startDate) + ' to ' + App.fmtDate(w.endDate) + ' (' + w.month + ', ' + w.quarter + ')</h3>' +
+          '<div class="grid-3">' +
+            infoBlock('Strategic Theme', w.strategicTheme) +
+            infoBlock('Campaign', w.campaign) +
+            infoBlock('Primary / Secondary Market', w.primaryMarket + (w.secondaryMarket ? ' / ' + w.secondaryMarket : '')) +
+          '</div>' +
+          '<div class="grid-3" style="margin-top:12px">' +
+            infoBlock('Sales Target (Week)', App.fmtMoney(w.salesTargetWeek)) +
+            infoBlock('Revenue Target (Week)', App.fmtMoney(w.revenueTargetWeek)) +
+            infoBlock('Budget Planned (Week)', App.fmtMoney(w.budgetPlannedWeek)) +
+          '</div></div>' +
+          '<div class="card"><div class="toolbar"><h3 style="margin:0">Tasks this week</h3><button class="btn small" id="btnAddWeekTask">+ Add Task</button></div>' +
+          taskTable(tasks) + '</div>'
+        );
+        document.getElementById('btnAddWeekTask').onclick = function () { App.Forms.openTaskForm(null, w.weekId); };
+        wireTaskRowActions();
+      });
+    });
+  }
+};
+
+function infoBlock(label, value) {
+  return '<div><div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;margin-bottom:3px">' + label + '</div><div style="font-size:13.5px;font-weight:600">' + App.esc(value || '—') + '</div></div>';
+}
+
+// ---------------------------------------------------------------- Tasks
+App.Views.tasks = function () {
+  var filters = {};
+  App.setFilters(
+    '<select id="fltStatus"><option value="">All Status</option></select>' +
+    '<select id="fltPriority"><option value="">All Priority</option></select>' +
+    '<input class="search" id="fltSearch" placeholder="Search tasks…">' +
+    '<button class="btn small" id="btnAddTask">+ Add Task</button>'
+  );
+  fillOptions('fltStatus', App.state.lookups.taskStatus);
+  fillOptions('fltPriority', App.state.lookups.taskPriority);
+  document.getElementById('btnAddTask').onclick = function () { App.Forms.openTaskForm(null, null); };
+  ['fltStatus', 'fltPriority'].forEach(function (id) {
+    document.getElementById(id).onchange = function () { load(); };
+  });
+  document.getElementById('fltSearch').oninput = debounce(function () { load(); }, 300);
+
+  function load() {
+    filters.status = document.getElementById('fltStatus').value;
+    filters.priority = document.getElementById('fltPriority').value;
+    filters._search = document.getElementById('fltSearch').value;
+    App.call('api_getTasks', filters).then(function (res) {
+      if (!res.ok) return App.showError(res.error);
+      App.setContent('<div class="card">' + taskTable(res.data) + '</div>');
+      wireTaskRowActions();
+    });
+  }
+  load();
+};
+
+function taskTable(tasks) {
+  return App.table([
+    { key: 'trafficLight', label: '', render: function (r) { return App.light(r.trafficLight || 'GREEN'); } },
+    { key: 'weekId', label: 'Week' },
+    { key: 'task', label: 'Task' },
+    { key: 'taskCategory', label: 'Category' },
+    { key: 'taskOwner', label: 'Owner' },
+    { key: 'priority', label: 'Priority', render: function (r) { return App.badge(r.priority, r.priority === 'Critical' ? 'red' : (r.priority === 'High' ? 'yellow' : 'grey')); } },
+    { key: 'status', label: 'Status', render: function (r) { return App.badge(r.status, App.statusTone(r.status)); } },
+    { key: 'dueDate', label: 'Due', render: function (r) { return App.fmtDate(r.dueDate); } },
+    { key: 'percentCompletion', label: '%', render: function (r) { return App.fmtPct(r.percentCompletion); } },
+    { key: 'ceoAttentionRequired', label: 'CEO?', render: function (r) { return r.ceoAttentionRequired ? '⚑' : ''; } }
+  ], tasks, {
+    actions: function (r) { return '<a data-edit="' + r.taskId + '">Edit</a><a data-del="' + r.taskId + '">Delete</a>'; }
+  });
+}
+
+function wireTaskRowActions() {
+  document.querySelectorAll('[data-edit]').forEach(function (el) {
+    el.onclick = function () {
+      App.call('api_getTasks', { taskId: el.getAttribute('data-edit') }).then(function (res) {
+        if (res.ok && res.data[0]) App.Forms.openTaskForm(res.data[0]);
+      });
+    };
+  });
+  document.querySelectorAll('[data-del]').forEach(function (el) {
+    el.onclick = function () {
+      if (!confirm('Delete this task?')) return;
+      App.call('api_deleteTask', el.getAttribute('data-del')).then(function () { App.navigate('tasks'); });
+    };
+  });
+}
+
+// ---------------------------------------------------------------- Sales CRM (Pipeline)
+App.Views.crm = function () {
+  App.setFilters('<select id="fltStage"><option value="">All Stages</option></select><input class="search" id="fltSearch" placeholder="Search opportunities…"><button class="btn small" id="btnAddOpp">+ Add Opportunity</button>');
+  fillOptions('fltStage', App.state.lookups.salesStages.map(function (s) { return s.name; }));
+  document.getElementById('btnAddOpp').onclick = function () { App.Forms.openPipelineForm(null); };
+  document.getElementById('fltStage').onchange = load;
+  document.getElementById('fltSearch').oninput = debounce(load, 300);
+
+  function load() {
+    var filters = { stage: document.getElementById('fltStage').value, _search: document.getElementById('fltSearch').value };
+    Promise.all([App.call('api_getPipeline', filters), App.call('api_getPipelineSummary')]).then(function (results) {
+      var oppRes = results[0], sumRes = results[1];
+      if (!oppRes.ok) return App.showError(oppRes.error);
+      var s = sumRes.ok ? sumRes.data : {};
+      App.setContent(
+        '<div class="kpi-grid">' +
+          kpiTile('Total Pipeline', App.fmtMoney(s.totalPipeline), 'Coverage ' + (s.coverage || 0).toFixed(1) + 'x (target ~3.0x)') +
+          kpiTile('Weighted Pipeline', App.fmtMoney(s.weightedPipeline), '') +
+          kpiTile('Win Rate', App.fmtPct(s.winRate), (s.wonCount || 0) + ' won / ' + (s.lostCount || 0) + ' lost') +
+          kpiTile('Avg Deal Size', App.fmtMoney(s.avgDealSize), s.avgSalesCycleDays ? s.avgSalesCycleDays + ' day avg cycle' : '') +
+        '</div>' +
+        '<div class="card">' + App.table([
+          { key: 'organization', label: 'Organization' },
+          { key: 'market', label: 'Market' },
+          { key: 'bdOwner', label: 'BD Owner' },
+          { key: 'businessUnit', label: 'Business Unit' },
+          { key: 'estimatedOpportunityValue', label: 'Value', render: function (r) { return App.fmtMoney(r.estimatedOpportunityValue); } },
+          { key: 'stage', label: 'Stage', render: function (r) { return App.badge(r.stage, App.statusTone(r.stage)); } },
+          { key: 'weightedValue', label: 'Weighted', render: function (r) { return App.fmtMoney(r.weightedValue); } },
+          { key: 'nextAction', label: 'Next Action' },
+          { key: 'nextActionDate', label: 'Next Action Date', render: function (r) { return App.fmtDate(r.nextActionDate); } }
+        ], oppRes.data, { actions: function (r) { return '<a data-edit-opp="' + r.opportunityId + '">Edit</a><a data-del-opp="' + r.opportunityId + '">Delete</a>'; } }) + '</div>'
+      );
+      document.querySelectorAll('[data-edit-opp]').forEach(function (el) {
+        el.onclick = function () {
+          var id = el.getAttribute('data-edit-opp');
+          var rec = oppRes.data.filter(function (o) { return o.opportunityId === id; })[0];
+          App.Forms.openPipelineForm(rec);
+        };
+      });
+      document.querySelectorAll('[data-del-opp]').forEach(function (el) {
+        el.onclick = function () { if (confirm('Delete opportunity?')) App.call('api_deletePipeline', el.getAttribute('data-del-opp')).then(function () { App.navigate('crm'); }); };
+      });
+    });
+  }
+  load();
+};
+
+// ---------------------------------------------------------------- Revenue
+App.Views.revenue = function () {
+  App.setFilters('<button class="btn small" id="btnAddRev">+ Add Revenue Record</button>');
+  document.getElementById('btnAddRev').onclick = function () { App.Forms.openRevenueForm(null); };
+  Promise.all([App.call('api_getRevenue'), App.call('api_getRevenueSummary')]).then(function (results) {
+    var revRes = results[0], sumRes = results[1];
+    if (!revRes.ok) return App.showError(revRes.error);
+    var s = sumRes.ok ? sumRes.data : {};
+    App.setContent(
+      '<div class="kpi-grid">' +
+        kpiTile('Sales Bookings', App.fmtMoney(s.bookings), 'Target ' + App.fmtMoney(s.bookingsTarget)) +
+        kpiTile('Invoiced', App.fmtMoney(s.invoiced), '') +
+        kpiTile('Recognized Revenue', App.fmtMoney(s.recognized), 'Target ' + App.fmtMoney(s.revenueTarget)) +
+        kpiTile('Cash Collected', App.fmtMoney(s.collected), App.fmtPct(s.collectionPct) + ' of invoiced') +
+        kpiTile('Outstanding Receivables', App.fmtMoney(s.outstanding), '') +
+        kpiTile('DSO', s.dso !== null ? s.dso + ' days' : 'N/A', '') +
+      '</div>' +
+      '<div class="card">' + App.table([
+        { key: 'client', label: 'Client' }, { key: 'project', label: 'Project' }, { key: 'market', label: 'Market' },
+        { key: 'businessUnit', label: 'Business Unit' }, { key: 'bdOwner', label: 'BD Owner' },
+        { key: 'contractValue', label: 'Contract Value', render: function (r) { return App.fmtMoney(r.contractValue); } },
+        { key: 'invoiceAmount', label: 'Invoiced', render: function (r) { return App.fmtMoney(r.invoiceAmount); } },
+        { key: 'amountCollected', label: 'Collected', render: function (r) { return App.fmtMoney(r.amountCollected); } },
+        { key: 'outstanding', label: 'Outstanding', render: function (r) { return App.fmtMoney(r.outstanding); } },
+        { key: 'collectionStatus', label: 'Collection', render: function (r) { return App.badge(r.collectionStatus, App.statusTone(r.collectionStatus)); } },
+        { key: 'daysOutstanding', label: 'Days O/S' }
+      ], revRes.data, { actions: function (r) { return '<a data-edit-rev="' + r.revenueId + '">Edit</a><a data-del-rev="' + r.revenueId + '">Delete</a>'; } }) + '</div>'
+    );
+    document.querySelectorAll('[data-edit-rev]').forEach(function (el) {
+      el.onclick = function () {
+        var rec = revRes.data.filter(function (r) { return r.revenueId === el.getAttribute('data-edit-rev'); })[0];
+        App.Forms.openRevenueForm(rec);
+      };
+    });
+    document.querySelectorAll('[data-del-rev]').forEach(function (el) {
+      el.onclick = function () { if (confirm('Delete revenue record?')) App.call('api_deleteRevenue', el.getAttribute('data-del-rev')).then(function () { App.navigate('revenue'); }); };
+    });
+  });
+};
+
+// ---------------------------------------------------------------- Expenses
+App.Views.expenses = function () {
+  App.setFilters('<button class="btn small" id="btnAddExp">+ Add Expense</button>');
+  document.getElementById('btnAddExp').onclick = function () { App.Forms.openExpenseForm(null); };
+  Promise.all([App.call('api_getExpenses'), App.call('api_getExpenseSummary')]).then(function (results) {
+    var expRes = results[0], sumRes = results[1];
+    if (!expRes.ok) return App.showError(expRes.error);
+    var s = sumRes.ok ? sumRes.data : {};
+    App.setContent(
+      '<div class="kpi-grid">' +
+        kpiTile('Annual Budget', App.fmtMoney(s.annualBudget), '') +
+        kpiTile('Budgeted (logged)', App.fmtMoney(s.budgeted), '') +
+        kpiTile('Actual Spend', App.fmtMoney(s.actual), App.fmtPct(s.utilizationPct) + ' utilization') +
+        kpiTile('Variance', App.fmtMoney(s.variance), '') +
+      '</div>' +
+      '<div class="grid-2">' +
+        '<div class="card"><h3>Spend by Category</h3><div style="height:240px"><canvas id="chartExpCat"></canvas></div></div>' +
+        '<div class="card"><h3>Spend by Market</h3><div style="height:240px"><canvas id="chartExpMarket"></canvas></div></div>' +
+      '</div>' +
+      '<div class="card">' + App.table([
+        { key: 'date', label: 'Date', render: function (r) { return App.fmtDate(r.date); } },
+        { key: 'market', label: 'Market' }, { key: 'expenseCategory', label: 'Category' },
+        { key: 'expenseDescription', label: 'Description' }, { key: 'vendor', label: 'Vendor' },
+        { key: 'budgetedAmount', label: 'Budgeted', render: function (r) { return App.fmtMoney(r.budgetedAmount); } },
+        { key: 'actualAmount', label: 'Actual', render: function (r) { return App.fmtMoney(r.actualAmount); } },
+        { key: 'variance', label: 'Variance', render: function (r) { return App.fmtMoney(r.variance); } },
+        { key: 'paymentStatus', label: 'Payment', render: function (r) { return App.badge(r.paymentStatus, App.statusTone(r.paymentStatus)); } }
+      ], expRes.data, { actions: function (r) { return '<a data-edit-exp="' + r.expenseId + '">Edit</a><a data-del-exp="' + r.expenseId + '">Delete</a>'; } }) + '</div>'
+    );
+    App.pieChart('chartExpCat', Object.keys(s.byCategory || {}), Object.values(s.byCategory || {}));
+    App.pieChart('chartExpMarket', Object.keys(s.byMarket || {}), Object.values(s.byMarket || {}));
+    document.querySelectorAll('[data-edit-exp]').forEach(function (el) {
+      el.onclick = function () {
+        var rec = expRes.data.filter(function (r) { return r.expenseId === el.getAttribute('data-edit-exp'); })[0];
+        App.Forms.openExpenseForm(rec);
+      };
+    });
+    document.querySelectorAll('[data-del-exp]').forEach(function (el) {
+      el.onclick = function () { if (confirm('Delete expense?')) App.call('api_deleteExpense', el.getAttribute('data-del-exp')).then(function () { App.navigate('expenses'); }); };
+    });
+  });
+};
+
+// ---------------------------------------------------------------- Markets (heatmap)
+App.Views.markets = function () {
+  App.call('api_getMarketsPerformance').then(function (res) {
+    if (!res.ok) return App.showError(res.error);
+    var colorFor = { GREEN: '#1a7f4e', YELLOW: '#c9a227', RED: '#b3261e', 'N/A': '#8a93a6' };
+    var cells = res.data.map(function (m) {
+      return '<div class="heat-cell" style="background:' + colorFor[m.health] + '"><div class="m-name">' + App.esc(m.market) + '</div>' +
+        '<div class="m-pct">' + (m.achievementPct === null ? '—' : App.fmtPct(m.achievementPct)) + '</div>' +
+        '<div class="m-sub">' + App.fmtMoney(m.revenueActual) + ' / ' + App.fmtMoney(m.revenueTarget) + '</div></div>';
+    }).join('');
+    App.setContent(
+      '<div class="card"><h3>Markets Performance Heatmap</h3><div class="heatmap-grid">' + cells + '</div></div>' +
+      '<div class="card">' + App.table([
+        { key: 'market', label: 'Market' }, { key: 'country', label: 'Country' }, { key: 'owner', label: 'Owner' },
+        { key: 'revenueTarget', label: 'Target', render: function (r) { return App.fmtMoney(r.revenueTarget); } },
+        { key: 'revenueActual', label: 'Actual', render: function (r) { return App.fmtMoney(r.revenueActual); } },
+        { key: 'achievementPct', label: 'Achievement', render: function (r) { return r.achievementPct === null ? '—' : App.fmtPct(r.achievementPct); } },
+        { key: 'pipelineValue', label: 'Open Pipeline', render: function (r) { return App.fmtMoney(r.pipelineValue); } },
+        { key: 'spend', label: 'Spend', render: function (r) { return App.fmtMoney(r.spend); } },
+        { key: 'status', label: 'Status' }
+      ], res.data) + '</div>'
+    );
+  });
+};
+
+// ---------------------------------------------------------------- Campaigns
+App.Views.campaigns = function () {
+  App.setFilters('<button class="btn small" id="btnAddCmp">+ Add Campaign</button>');
+  document.getElementById('btnAddCmp').onclick = function () { App.Forms.openCampaignForm(null); };
+  App.call('api_getCampaigns').then(function (res) {
+    if (!res.ok) return App.showError(res.error);
+    App.setContent('<div class="card">' + App.table([
+      { key: 'campaign', label: 'Campaign' }, { key: 'market', label: 'Market' }, { key: 'channel', label: 'Channel' },
+      { key: 'budget', label: 'Budget', render: function (r) { return App.fmtMoney(r.budget); } },
+      { key: 'actualSpend', label: 'Actual', render: function (r) { return App.fmtMoney(r.actualSpend); } },
+      { key: 'leads', label: 'Leads' }, { key: 'qualifiedLeads', label: 'Qual. Leads' }, { key: 'proposals', label: 'Proposals' }, { key: 'wins', label: 'Wins' },
+      { key: 'roi', label: 'ROI', render: function (r) { return App.fmtPct(r.roi); } },
+      { key: 'status', label: 'Status', render: function (r) { return App.badge(r.status, App.statusTone(r.status)); } }
+    ], res.data, { actions: function (r) { return '<a data-edit-cmp="' + r.campaignId + '">Edit</a><a data-del-cmp="' + r.campaignId + '">Delete</a>'; } }) + '</div>');
+    document.querySelectorAll('[data-edit-cmp]').forEach(function (el) {
+      el.onclick = function () { App.Forms.openCampaignForm(res.data.filter(function (c) { return c.campaignId === el.getAttribute('data-edit-cmp'); })[0]); };
+    });
+    document.querySelectorAll('[data-del-cmp]').forEach(function (el) {
+      el.onclick = function () { if (confirm('Delete campaign?')) App.call('api_deleteCampaign', el.getAttribute('data-del-cmp')).then(function () { App.navigate('campaigns'); }); };
+    });
+  });
+};
+
+// ---------------------------------------------------------------- Events
+App.Views.events = function () {
+  App.setFilters('<button class="btn small" id="btnAddEvt">+ Add Event</button>');
+  document.getElementById('btnAddEvt').onclick = function () { App.Forms.openEventForm(null); };
+  App.call('api_getEvents').then(function (res) {
+    if (!res.ok) return App.showError(res.error);
+    App.setContent('<div class="card">' + App.table([
+      { key: 'eventName', label: 'Event' }, { key: 'city', label: 'City' }, { key: 'date', label: 'Date', render: function (r) { return App.fmtDate(r.date); } },
+      { key: 'eventType', label: 'Type' },
+      { key: 'budget', label: 'Budget', render: function (r) { return App.fmtMoney(r.budget); } },
+      { key: 'actualCost', label: 'Actual Cost', render: function (r) { return App.fmtMoney(r.actualCost); } },
+      { key: 'meetingsGenerated', label: 'Meetings' }, { key: 'opportunities', label: 'Opportunities' }, { key: 'contractsWon', label: 'Won' },
+      { key: 'eventROI', label: 'ROI', render: function (r) { return App.fmtPct(r.eventROI); } }
+    ], res.data, { actions: function (r) { return '<a data-edit-evt="' + r.eventId + '">Edit</a><a data-del-evt="' + r.eventId + '">Delete</a>'; } }) + '</div>');
+    document.querySelectorAll('[data-edit-evt]').forEach(function (el) {
+      el.onclick = function () { App.Forms.openEventForm(res.data.filter(function (e) { return e.eventId === el.getAttribute('data-edit-evt'); })[0]); };
+    });
+    document.querySelectorAll('[data-del-evt]').forEach(function (el) {
+      el.onclick = function () { if (confirm('Delete event?')) App.call('api_deleteEvent', el.getAttribute('data-del-evt')).then(function () { App.navigate('events'); }); };
+    });
+  });
+};
+
+// ---------------------------------------------------------------- Generic-CRUD-backed views
+App.Views.projects = function () { genericListView(SHEETS_JS.PROJECTS, 'projectId', [
+  { key: 'projectName', label: 'Project' }, { key: 'clientId', label: 'Client ID' }, { key: 'businessUnit', label: 'Business Unit' },
+  { key: 'market', label: 'Market' }, { key: 'pmoOwner', label: 'PMO Owner' }, { key: 'status', label: 'Status', render: function (r) { return App.badge(r.status, App.statusTone(r.status)); } },
+  { key: 'percentComplete', label: '% Complete', render: function (r) { return App.fmtPct(r.percentComplete); } },
+  { key: 'grossMargin', label: 'Gross Margin', render: function (r) { return App.fmtPct(r.grossMargin); } }, { key: 'nps', label: 'NPS' }
+], 'Project'); };
+
+App.Views.academy = function () { genericListView(SHEETS_JS.ACADEMY, 'academyId', [
+  { key: 'program', label: 'Program' }, { key: 'client', label: 'Client' }, { key: 'programType', label: 'Type' },
+  { key: 'participants', label: 'Participants' }, { key: 'revenue', label: 'Revenue', render: function (r) { return App.fmtMoney(r.revenue); } },
+  { key: 'cost', label: 'Cost', render: function (r) { return App.fmtMoney(r.cost); } }, { key: 'margin', label: 'Margin', render: function (r) { return App.fmtMoney(r.margin); } },
+  { key: 'nps', label: 'NPS' }
+], 'Academy Program'); };
+
+App.Views.partnerships = function () { genericListView(SHEETS_JS.PARTNERSHIPS, 'partnershipId', [
+  { key: 'partner', label: 'Partner' }, { key: 'country', label: 'Country' }, { key: 'commercialTerms', label: 'Terms' },
+  { key: 'commission', label: 'Commission', render: function (r) { return App.fmtPct(r.commission); } },
+  { key: 'agreementStart', label: 'Start', render: function (r) { return App.fmtDate(r.agreementStart); } },
+  { key: 'agreementEnd', label: 'End', render: function (r) { return App.fmtDate(r.agreementEnd); } },
+  { key: 'revenueGenerated', label: 'Revenue', render: function (r) { return App.fmtMoney(r.revenueGenerated); } },
+  { key: 'status', label: 'Status', render: function (r) { return App.badge(r.status, App.statusTone(r.status)); } }
+], 'Partnership'); };
+
+var SHEETS_JS = {
+  TARGET_ACCOUNTS: '09_Target_Accounts', PARTNERSHIPS: '18_Partnerships', ACADEMY: '19_Academy',
+  CASE_STUDIES: '20_Case_Studies', DIGITAL_ROADMAP: '21_Digital_Roadmap', DECISIONS: '25_Decisions',
+  RISKS: '24_Risks', PROJECTS: '17_Projects', CLIENTS: '16_Clients', TEAM: '15_Team',
+  MARKETS: '13_Markets', BUSINESS_UNITS: '14_Business_Units'
+};
+
+function genericListView(sheetName, idKey, columns, entityLabel) {
+  App.setFilters('<button class="btn small" id="btnAddGeneric">+ Add ' + entityLabel + '</button>');
+  document.getElementById('btnAddGeneric').onclick = function () { App.Forms.openGenericForm(sheetName, idKey, null, entityLabel); };
+  App.call('api_getGenericRecords', sheetName).then(function (res) {
+    if (!res.ok) return App.showError(res.error);
+    App.setContent('<div class="card">' + App.table(columns, res.data, {
+      actions: function (r) { return '<a data-edit-g="' + r[idKey] + '">Edit</a><a data-del-g="' + r[idKey] + '">Delete</a>'; }
+    }) + '</div>');
+    document.querySelectorAll('[data-edit-g]').forEach(function (el) {
+      el.onclick = function () { App.Forms.openGenericForm(sheetName, idKey, res.data.filter(function (r) { return r[idKey] === el.getAttribute('data-edit-g'); })[0], entityLabel); };
+    });
+    document.querySelectorAll('[data-del-g]').forEach(function (el) {
+      el.onclick = function () { if (confirm('Delete this record?')) App.call('api_deleteGenericRecord', sheetName, el.getAttribute('data-del-g')).then(function () { App.navigate(App.state.currentView); }); };
+    });
+  });
+}
+
+// ---------------------------------------------------------------- KPIs
+App.Views.kpis = function () {
+  App.call('api_getKpis').then(function (res) {
+    if (!res.ok) return App.showError(res.error);
+    var byCategory = {};
+    res.data.forEach(function (k) { (byCategory[k.kpiCategory] = byCategory[k.kpiCategory] || []).push(k); });
+    var html = Object.keys(byCategory).map(function (cat) {
+      return '<div class="card"><h3>' + cat + '</h3>' + App.table([
+        { key: 'kpiName', label: 'KPI' }, { key: 'description', label: 'Description / Formula' },
+        { key: 'target', label: 'Target' }, { key: 'actual', label: 'Actual', render: function (r) { return typeof r.actual === 'number' ? App.fmtMoney(r.actual) : App.esc(r.actual); } }
+      ], byCategory[cat]) + '</div>';
+    }).join('');
+    App.setContent(html);
+  });
+};
+
+// ---------------------------------------------------------------- Monthly Review
+App.Views.monthlyReview = function () {
+  var months = App.state.lookups.months;
+  var currentMonth = months[new Date().getMonth()];
+  App.setFilters('<select id="monthPicker">' + months.map(function (m) { return '<option value="' + m + '"' + (m === currentMonth ? ' selected' : '') + '>' + m + '</option>'; }).join('') + '</select>');
+  document.getElementById('monthPicker').onchange = function (e) { load(e.target.value); };
+  load(currentMonth);
+
+  function load(month) {
+    App.call('api_getMonthlyReview', month).then(function (res) {
+      if (!res.ok || !res.data) return App.showError((res.error) || 'No plan data for ' + month);
+      var m = res.data;
+      App.setContent(
+        '<div class="card"><h3>Automated CEO Summary — ' + month + '</h3><div class="summary-box">' + App.esc(m.generatedSummary) + '</div></div>' +
+        '<div class="grid-2">' +
+          '<div class="card"><h3>Target vs Actual</h3>' +
+            App.progressBar(m.revenueTarget ? m.revenueActual / m.revenueTarget : 0, 'Revenue — ' + App.fmtMoney(m.revenueActual) + ' / ' + App.fmtMoney(m.revenueTarget)) +
+            '<div style="height:8px"></div>' +
+            App.progressBar(m.bookingsTarget ? m.bookingsActual / m.bookingsTarget : 0, 'Bookings — ' + App.fmtMoney(m.bookingsActual) + ' / ' + App.fmtMoney(m.bookingsTarget)) +
+            '<div style="height:8px"></div>' +
+            App.progressBar(m.budget ? m.spend / m.budget : 0, 'Budget Utilization — ' + App.fmtMoney(m.spend) + ' / ' + App.fmtMoney(m.budget)) +
+          '</div>' +
+          '<div class="card"><h3>Market & Service Performance</h3>' +
+            infoBlock('Best Performing Market', m.bestMarket) + '<div style="height:10px"></div>' +
+            infoBlock('Weakest Market', m.worstMarket) + '<div style="height:10px"></div>' +
+            infoBlock('Top Revenue Service', m.topService) + '<div style="height:10px"></div>' +
+            infoBlock('Top Pipeline-Generating Campaign', m.topCampaign) + '<div style="height:10px"></div>' +
+            infoBlock('Campaign ROI', App.fmtPct(m.roi)) +
+          '</div>' +
+        '</div>' +
+        '<div class="grid-2">' +
+          '<div class="card"><h3>Deals Lost (' + m.dealsLost + ')</h3>' + listOrEmpty(m.lostReasons) + '</div>' +
+          '<div class="card"><h3>Tasks Missed</h3>' + listOrEmpty(m.tasksMissed) + '</div>' +
+        '</div>' +
+        '<div class="card"><h3>CEO Decisions Needed</h3>' + listOrEmpty(m.ceoDecisionsNeeded) + '</div>'
+      );
+    });
+  }
+};
+
+function listOrEmpty(arr) {
+  if (!arr || !arr.length) return '<div class="empty-state">None.</div>';
+  return '<ul style="margin:0;padding-left:18px">' + arr.map(function (a) { return '<li>' + App.esc(a) + '</li>'; }).join('') + '</ul>';
+}
+
+// ---------------------------------------------------------------- CEO Weekly Review
+App.Views.ceoReview = function () {
+  App.call('api_getWeeklyReview', null).then(function (res) {
+    if (!res.ok || !res.data) return App.showError(res.error || 'No current week found.');
+    var d = res.data, w = d.week, sow = d.startOfWeek, eow = d.endOfWeek;
+    App.setContent(
+      '<div class="card"><h3>' + w.weekId + ' (' + App.fmtDate(w.startDate) + ' – ' + App.fmtDate(w.endDate) + ') — ' + w.strategicTheme + '</h3></div>' +
+      '<div class="grid-2">' +
+        '<div class="card"><h3>START OF WEEK — This Week</h3>' +
+          infoBlock('Top Priorities', sow.topPriorities.map(function (t) { return t.task; }).join('; ') || '—') +
+          '<div style="height:10px"></div>' + infoBlock('Sales Target', App.fmtMoney(sow.salesTarget)) +
+          '<div style="height:10px"></div>' + infoBlock('Expected Collections', App.fmtMoney(sow.expectedCollections)) +
+          '<div style="height:10px"></div>' + infoBlock('Critical Tasks', sow.criticalTasks.length) +
+          '<div style="height:10px"></div>' + infoBlock('Blocked Tasks', sow.blockedTasks.length) +
+          '<div style="height:10px"></div>' + infoBlock('Overdue Tasks', sow.overdueTasks.length) +
+          '<div style="height:10px"></div>' + infoBlock('Budget Planned', App.fmtMoney(sow.budgetPlanned)) +
+          '<div style="height:10px"></div>' + infoBlock('Pipeline Expected to Move', sow.pipelineExpectedToMove) +
+          '<div style="height:10px"></div>' + infoBlock('Deals Expected to Close', sow.dealsExpectedToClose) +
+        '</div>' +
+        '<div class="card"><h3>END OF WEEK — Results</h3>' +
+          App.progressBar(eow.completionPct, 'Tasks Completed — ' + eow.tasksCompleted + ' / ' + eow.tasksPlanned) +
+          '<div style="height:10px"></div>' + infoBlock('Tasks Overdue', eow.tasksOverdue) +
+          '<div style="height:10px"></div>' + infoBlock('Spend This Week', App.fmtMoney(eow.spendThisWeek)) +
+          '<div style="height:10px"></div>' + infoBlock('Revenue Collected', App.fmtMoney(eow.revenueCollected)) +
+          '<div style="height:10px"></div>' + infoBlock('Bookings', App.fmtMoney(eow.bookings)) +
+          '<div style="height:10px"></div>' + infoBlock('Pipeline Added', App.fmtMoney(eow.pipelineAdded)) +
+          '<div style="height:10px"></div>' + infoBlock('Meetings Done', eow.meetingsDone) +
+          '<div style="height:10px"></div>' + infoBlock('Proposals Submitted', eow.proposalsSubmitted) +
+          '<div style="height:10px"></div>' + infoBlock('Wins', eow.wins) +
+        '</div>' +
+      '</div>' +
+      '<div class="grid-2">' +
+        '<div class="card"><h3>Main Problems</h3>' + listOrEmpty(eow.mainProblems) + '</div>' +
+        '<div class="card"><h3>CEO Decisions Required</h3>' + listOrEmpty(eow.ceoDecisionsRequired) + '</div>' +
+      '</div>'
+    );
+  });
+};
+
+// ---------------------------------------------------------------- Settings
+App.Views.settings = function () {
+  var tabs = [
+    { id: 'team', label: 'Team' }, { id: 'markets', label: 'Markets' }, { id: 'businessUnits', label: 'Business Units' },
+    { id: 'clients', label: 'Clients' }, { id: 'targetAccounts', label: 'Target Accounts' },
+    { id: 'caseStudies', label: 'Case Studies' }, { id: 'digitalRoadmap', label: 'Digital Roadmap' },
+    { id: 'decisions', label: 'Decisions' }, { id: 'risks', label: 'Risks' }, { id: 'general', label: 'General' }
+  ];
+  var active = 'team';
+  render();
+
+  function render() {
+    var tabsHtml = '<div class="tabs">' + tabs.map(function (t) { return '<div class="tab' + (t.id === active ? ' active' : '') + '" data-tab="' + t.id + '">' + t.label + '</div>'; }).join('') + '</div>';
+    App.setContent('<div class="card">' + tabsHtml + '<div id="settings-body"><div class="loading">Loading…</div></div></div>');
+    document.querySelectorAll('[data-tab]').forEach(function (el) { el.onclick = function () { active = el.getAttribute('data-tab'); render(); }; });
+    loadTab();
+  }
+
+  function loadTab() {
+    var body = document.getElementById('settings-body');
+    if (active === 'general') {
+      App.call('api_getSettings').then(function (res) {
+        var rows = Object.keys(res.data || {}).map(function (k) { return { setting: k, value: res.data[k] }; });
+        body.innerHTML = App.table([{ key: 'setting', label: 'Setting' }, { key: 'value', label: 'Value' }], rows);
+      });
+      return;
+    }
+    var map = {
+      team: [SHEETS_JS.TEAM, 'teamId', [{ key: 'name', label: 'Name' }, { key: 'role', label: 'Role' }, { key: 'responsibilities', label: 'Responsibilities' }, { key: 'marketsOwned', label: 'Markets Owned' }, { key: 'active', label: 'Active', render: function (r) { return r.active ? '✔' : ''; } }], 'Team Member'],
+      markets: [SHEETS_JS.MARKETS, 'marketId', [{ key: 'market', label: 'Market' }, { key: 'country', label: 'Country' }, { key: 'revenueTarget2027', label: 'Revenue Target', render: function (r) { return App.fmtMoney(r.revenueTarget2027); } }, { key: 'owner', label: 'Owner' }, { key: 'status', label: 'Status' }], 'Market'],
+      businessUnits: [SHEETS_JS.BUSINESS_UNITS, 'buId', [{ key: 'businessUnit', label: 'Business Unit' }, { key: 'service', label: 'Service' }], 'Business Unit / Service'],
+      clients: [SHEETS_JS.CLIENTS, 'clientId', [{ key: 'clientName', label: 'Client' }, { key: 'market', label: 'Market' }, { key: 'sector', label: 'Sector' }, { key: 'primaryContact', label: 'Contact' }, { key: 'relationshipOwner', label: 'Owner' }, { key: 'status', label: 'Status' }], 'Client'],
+      targetAccounts: [SHEETS_JS.TARGET_ACCOUNTS, 'accountId', [{ key: 'organization', label: 'Organization' }, { key: 'country', label: 'Country' }, { key: 'priorityTier', label: 'Tier' }, { key: 'estimatedOpportunity', label: 'Est. Opportunity', render: function (r) { return App.fmtMoney(r.estimatedOpportunity); } }, { key: 'assignedBD', label: 'Assigned BD' }, { key: 'nextAction', label: 'Next Action' }], 'Target Account'],
+      caseStudies: [SHEETS_JS.CASE_STUDIES, 'caseStudyId', [{ key: 'caseStudy', label: 'Case Study' }, { key: 'client', label: 'Client' }, { key: 'sector', label: 'Sector' }, { key: 'salesDeckReady', label: 'Deck Ready', render: function (r) { return r.salesDeckReady ? '✔' : ''; } }, { key: 'owner', label: 'Owner' }], 'Case Study'],
+      digitalRoadmap: [SHEETS_JS.DIGITAL_ROADMAP, 'featureId', [{ key: 'feature', label: 'Feature' }, { key: 'phase', label: 'Phase' }, { key: 'owner', label: 'Owner' }, { key: 'deadline', label: 'Deadline', render: function (r) { return App.fmtDate(r.deadline); } }, { key: 'status', label: 'Status', render: function (r) { return App.badge(r.status, App.statusTone(r.status)); } }], 'Digital Roadmap Item'],
+      decisions: [SHEETS_JS.DECISIONS, 'decisionId', [{ key: 'date', label: 'Date', render: function (r) { return App.fmtDate(r.date); } }, { key: 'issue', label: 'Issue' }, { key: 'decision', label: 'Decision' }, { key: 'decisionOwner', label: 'Owner' }, { key: 'status', label: 'Status', render: function (r) { return App.badge(r.status, App.statusTone(r.status)); } }], 'Decision'],
+      risks: [SHEETS_JS.RISKS, 'riskId', [{ key: 'risk', label: 'Risk' }, { key: 'category', label: 'Category' }, { key: 'riskScore', label: 'Score' }, { key: 'owner', label: 'Owner' }, { key: 'status', label: 'Status', render: function (r) { return App.badge(r.status, App.statusTone(r.status)); } }], 'Risk']
+    };
+    var cfg = map[active];
+    if (!cfg) { body.innerHTML = ''; return; }
+    var sheetName = cfg[0], idKey = cfg[1], columns = cfg[2], label = cfg[3];
+    App.call('api_getGenericRecords', sheetName).then(function (res) {
+      if (!res.ok) { body.innerHTML = '<div class="empty-state">' + App.esc(res.error) + '</div>'; return; }
+      body.innerHTML = '<div class="toolbar"><span></span><button class="btn small" id="btnAddSettingsRec">+ Add ' + label + '</button></div>' +
+        App.table(columns, res.data, { actions: function (r) { return '<a data-edit-s="' + r[idKey] + '">Edit</a><a data-del-s="' + r[idKey] + '">Delete</a>'; } });
+      document.getElementById('btnAddSettingsRec').onclick = function () { App.Forms.openGenericForm(sheetName, idKey, null, label, loadTab); };
+      document.querySelectorAll('[data-edit-s]').forEach(function (el) {
+        el.onclick = function () { App.Forms.openGenericForm(sheetName, idKey, res.data.filter(function (r) { return r[idKey] === el.getAttribute('data-edit-s'); })[0], label, loadTab); };
+      });
+      document.querySelectorAll('[data-del-s]').forEach(function (el) {
+        el.onclick = function () { if (confirm('Delete this record?')) App.call('api_deleteGenericRecord', sheetName, el.getAttribute('data-del-s')).then(loadTab); };
+      });
+    });
+  }
+};
+
+// ---------------------------------------------------------------- utils
+function fillOptions(id, list) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  (list || []).forEach(function (v) { var o = document.createElement('option'); o.value = v; o.textContent = v; el.appendChild(o); });
+}
+function debounce(fn, ms) { var t; return function () { clearTimeout(t); var a = arguments; t = setTimeout(function () { fn.apply(null, a); }, ms); }; }
+</script>

@@ -1,0 +1,230 @@
+<script>
+/**
+ * Core: state, server-call wrapper, formatting helpers, nav, generic table/chart/modal builders.
+ * Views (dashboard, tasks, CRM, etc.) live in JS_Views.html; CRUD forms live in JS_Forms.html.
+ * Both attach to the same global `App` object defined here.
+ */
+var App = {
+  state: { lookups: null, charts: {}, currentView: 'dashboard' },
+
+  NAV: [
+    { id: 'dashboard', label: 'Dashboard', icon: '◆' },
+    { id: 'weekly', label: 'Weekly Execution', icon: '▤' },
+    { id: 'tasks', label: 'Tasks', icon: '☑' },
+    { id: 'crm', label: 'Sales CRM', icon: '⬢' },
+    { id: 'revenue', label: 'Revenue', icon: '$' },
+    { id: 'expenses', label: 'Expenses', icon: '−' },
+    { id: 'markets', label: 'Markets', icon: '⌖' },
+    { id: 'campaigns', label: 'Campaigns', icon: '▲' },
+    { id: 'events', label: 'Events', icon: '◷' },
+    { id: 'projects', label: 'Projects', icon: '▦' },
+    { id: 'academy', label: 'Academy', icon: '◈' },
+    { id: 'partnerships', label: 'Partnerships', icon: '⚭' },
+    { id: 'kpis', label: 'KPIs', icon: '▣' },
+    { id: 'monthlyReview', label: 'Monthly Review', icon: '▥' },
+    { id: 'ceoReview', label: 'CEO Weekly Review', icon: '★' },
+    { id: 'settings', label: 'Settings', icon: '⚙' }
+  ],
+
+  init: function () {
+    this.renderNav();
+    var self = this;
+    this.call('api_getLookups').then(function (res) {
+      self.state.lookups = res.ok ? res.data : {};
+      self.navigate('dashboard');
+    });
+  },
+
+  renderNav: function () {
+    var html = this.NAV.map(function (n) {
+      return '<div class="item" data-nav="' + n.id + '"><span class="icon">' + n.icon + '</span><span class="label-text">' + n.label + '</span></div>';
+    }).join('');
+    var el = document.getElementById('nav-list');
+    el.innerHTML = html;
+    el.querySelectorAll('.item').forEach(function (item) {
+      item.addEventListener('click', function () { App.navigate(item.getAttribute('data-nav')); });
+    });
+  },
+
+  navigate: function (viewId) {
+    this.state.currentView = viewId;
+    document.querySelectorAll('#nav-list .item').forEach(function (i) {
+      i.classList.toggle('active', i.getAttribute('data-nav') === viewId);
+    });
+    var nav = this.NAV.filter(function (n) { return n.id === viewId; })[0];
+    document.getElementById('page-title').textContent = nav ? nav.label : '';
+    document.getElementById('filters').innerHTML = '';
+    document.getElementById('content').innerHTML = '<div class="loading">Loading…</div>';
+    var renderer = this.Views[viewId];
+    if (renderer) renderer(); else this.setContent('<div class="empty-state">View not found.</div>');
+  },
+
+  // ---- Server call wrapper: promisifies google.script.run and unwraps the {ok,data} envelope. ----
+  call: function (fnName) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return new Promise(function (resolve) {
+      if (typeof google === 'undefined' || !google.script) {
+        resolve({ ok: false, error: 'Not running inside Apps Script (google.script.run unavailable).' });
+        return;
+      }
+      var runner = google.script.run
+        .withSuccessHandler(function (res) { resolve(res); })
+        .withFailureHandler(function (err) { resolve({ ok: false, error: String(err) }); });
+      runner[fnName].apply(runner, args);
+    });
+  },
+
+  setContent: function (html) { document.getElementById('content').innerHTML = html; },
+  setFilters: function (html) { document.getElementById('filters').innerHTML = html; },
+
+  showError: function (msg) {
+    this.setContent('<div class="card"><div class="empty-state">⚠ ' + this.esc(msg) + '</div></div>');
+  },
+
+  // ---- Formatting ----
+  esc: function (s) { var d = document.createElement('div'); d.textContent = (s === undefined || s === null) ? '' : String(s); return d.innerHTML; },
+  fmtMoney: function (n) { n = Number(n) || 0; return 'EGP ' + Math.round(n).toLocaleString('en-US'); },
+  fmtMoneyShort: function (n) {
+    n = Number(n) || 0;
+    if (Math.abs(n) >= 1000000) return (n / 1000000).toFixed(2) + 'M';
+    if (Math.abs(n) >= 1000) return (n / 1000).toFixed(0) + 'K';
+    return String(Math.round(n));
+  },
+  fmtPct: function (n) { return Math.round((Number(n) || 0) * 100) + '%'; },
+  fmtDate: function (d) {
+    if (!d) return '';
+    var dt = new Date(d);
+    if (isNaN(dt.getTime())) return '';
+    return dt.toISOString().slice(0, 10);
+  },
+
+  badge: function (text, tone) { return '<span class="badge ' + (tone || 'grey') + '">' + this.esc(text) + '</span>'; },
+  light: function (level) { return '<span class="light ' + (level || 'GREEN') + '"></span>'; },
+
+  statusTone: function (status) {
+    if (status === 'Completed' || status === 'Collected' || status === 'Won' || status === 'Paid' || status === 'Active') return 'green';
+    if (status === 'Blocked' || status === 'Overdue' || status === 'Lost' || status === 'Cancelled') return 'red';
+    if (status === 'Waiting' || status === 'In Progress' || status === 'Partially Paid' || status === 'Due') return 'yellow';
+    return 'grey';
+  },
+
+  progressBar: function (pct, label) {
+    pct = Math.max(0, Math.min(1, Number(pct) || 0));
+    var tone = pct >= 0.9 ? 'green' : (pct >= 0.6 ? 'yellow' : 'red');
+    return '<div class="progress-label"><span>' + (label || '') + '</span><span>' + this.fmtPct(pct) + '</span></div>' +
+      '<div class="progress-track"><div class="progress-fill ' + tone + '" style="width:' + (pct * 100) + '%"></div></div>';
+  },
+
+  // ---- Generic sortable/filterable data table ----
+  table: function (columns, rows, opts) {
+    opts = opts || {};
+    if (!rows.length) return '<div class="empty-state">No records yet.</div>';
+    var thead = columns.map(function (c) { return '<th>' + c.label + '</th>'; }).join('');
+    if (opts.actions) thead += '<th></th>';
+    var body = rows.map(function (r, idx) {
+      var tds = columns.map(function (c) {
+        var val = c.render ? c.render(r) : App.esc(r[c.key]);
+        return '<td>' + val + '</td>';
+      }).join('');
+      if (opts.actions) {
+        tds += '<td class="row-actions">' + opts.actions(r, idx) + '</td>';
+      }
+      return '<tr>' + tds + '</tr>';
+    }).join('');
+    return '<div class="table-scroll"><table class="data-table"><thead><tr>' + thead + '</tr></thead><tbody>' + body + '</tbody></table></div>';
+  },
+
+  // ---- Chart.js helpers ----
+  destroyChart: function (id) { if (this.state.charts[id]) { this.state.charts[id].destroy(); delete this.state.charts[id]; } },
+  chartColors: ['#1a2b4c', '#c9a24b', '#1a7f4e', '#b3261e', '#5b7fb5', '#8a6d00', '#7a5ea8', '#3f8f8a', '#c26a3f', '#4c6a92'],
+
+  barLineChart: function (canvasId, labels, datasets, type) {
+    this.destroyChart(canvasId);
+    var ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    this.state.charts[canvasId] = new Chart(ctx, {
+      type: type || 'bar',
+      data: { labels: labels, datasets: datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
+        scales: { y: { beginAtZero: true, ticks: { callback: function (v) { return App.fmtMoneyShort(v); } } } }
+      }
+    });
+  },
+
+  pieChart: function (canvasId, labels, values) {
+    this.destroyChart(canvasId);
+    var ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    this.state.charts[canvasId] = new Chart(ctx, {
+      type: 'doughnut',
+      data: { labels: labels, datasets: [{ data: values, backgroundColor: this.chartColors }] },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 10, font: { size: 11 } } } } }
+    });
+  },
+
+  // ---- Modal ----
+  openModal: function (title, bodyHtml, onSubmit) {
+    var wrap = document.createElement('div');
+    wrap.className = 'modal-backdrop';
+    wrap.id = 'modal-backdrop';
+    wrap.innerHTML = '<div class="modal"><h2>' + this.esc(title) + '</h2><div id="modal-body">' + bodyHtml + '</div>' +
+      '<div class="modal-actions"><button class="btn secondary" id="modal-cancel">Cancel</button><button class="btn" id="modal-save">Save</button></div></div>';
+    document.body.appendChild(wrap);
+    document.getElementById('modal-cancel').onclick = function () { App.closeModal(); };
+    wrap.addEventListener('click', function (e) { if (e.target === wrap) App.closeModal(); });
+    document.getElementById('modal-save').onclick = function () {
+      if (onSubmit) onSubmit();
+    };
+  },
+  closeModal: function () {
+    var el = document.getElementById('modal-backdrop');
+    if (el) el.remove();
+  },
+  formValues: function (fieldKeys) {
+    var out = {};
+    fieldKeys.forEach(function (k) {
+      var el = document.getElementById('f_' + k);
+      if (!el) return;
+      if (el.type === 'checkbox') out[k] = el.checked;
+      else out[k] = el.value;
+    });
+    return out;
+  },
+
+  field: function (key, label, type, options, value, full) {
+    var id = 'f_' + key;
+    var v = (value === undefined || value === null) ? '' : value;
+    var input;
+    if (type === 'select') {
+      input = '<select id="' + id + '">' + '<option value=""></option>' + options.map(function (o) {
+        var ov = (typeof o === 'object') ? o.value : o;
+        var ol = (typeof o === 'object') ? o.label : o;
+        return '<option value="' + App.esc(ov) + '"' + (String(ov) === String(v) ? ' selected' : '') + '>' + App.esc(ol) + '</option>';
+      }).join('') + '</select>';
+    } else if (type === 'textarea') {
+      input = '<textarea id="' + id + '" rows="2">' + App.esc(v) + '</textarea>';
+    } else if (type === 'checkbox') {
+      input = '<input type="checkbox" id="' + id + '" ' + (v === true || v === 'TRUE' ? 'checked' : '') + ' style="width:auto">';
+    } else if (type === 'date') {
+      input = '<input type="date" id="' + id + '" value="' + App.esc(App.fmtDate(v)) + '">';
+    } else if (type === 'number') {
+      input = '<input type="number" id="' + id + '" value="' + App.esc(v) + '">';
+    } else {
+      input = '<input type="text" id="' + id + '" value="' + App.esc(v) + '">';
+    }
+    return '<div class="form-field' + (full ? ' full' : '') + '"><label>' + label + '</label>' + input + '</div>';
+  },
+
+  toast: function (msg, isError) {
+    var t = document.createElement('div');
+    t.textContent = msg;
+    t.style.cssText = 'position:fixed;bottom:20px;right:20px;background:' + (isError ? '#b3261e' : '#1a7f4e') + ';color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;z-index:200;box-shadow:0 6px 20px rgba(0,0,0,.2)';
+    document.body.appendChild(t);
+    setTimeout(function () { t.remove(); }, 3200);
+  },
+
+  Views: {} // populated by JS_Views.html
+};
+</script>
