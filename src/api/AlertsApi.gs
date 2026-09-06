@@ -85,7 +85,10 @@ function mkAlert_(level, area, message) {
 }
 function pct_(n) { return Math.round(n * 100) + '%'; }
 function numFmt_(n) { return Math.round(Number(n) || 0).toLocaleString(); }
-function fmtDate_(d) { return Utilities.formatDate(new Date(d), 'GMT', 'yyyy-MM-dd'); }
+function fmtDate_(d) {
+  var dt = new Date(d);
+  return dt.getFullYear() + '-' + ('0' + (dt.getMonth() + 1)).slice(-2) + '-' + ('0' + dt.getDate()).slice(-2);
+}
 
 function quarterHasEnded_(quarter, today) {
   var endMonth = { Q1: 2, Q2: 5, Q3: 8, Q4: 11 }[quarter];

@@ -143,15 +143,23 @@ function deleteRecordById(sheetName, idValue) {
   }
 }
 
-/** Bulk-appends many records in a single write (used by seeders — far fewer API calls than looping appendRecord). */
+/**
+ * Bulk-appends many records in a single write (used by seeders — far fewer API calls than
+ * looping appendRecord). IDs for records that don't already have one are assigned
+ * sequentially in memory, starting from one scan of the sheet's current max ID — calling
+ * generateId() once per record here would have every record in the batch see the same
+ * (not-yet-updated) sheet and come back with the same "next" ID.
+ */
 function bulkAppendRecords(sheetName, records) {
   if (!records || records.length === 0) return;
   var sheet = getOrCreateSheet(sheetName);
   var schema = getSchema(sheetName);
   var idCol = schema.filter(function (c) { return c.idPrefix; })[0];
+  var nextIdNum = idCol ? nextIdSequenceStart_(sheetName, idCol.idPrefix) : null;
   var rows = records.map(function (record) {
     if (idCol && !record[idCol.key]) {
-      record[idCol.key] = generateId(sheetName, idCol.idPrefix);
+      record[idCol.key] = idCol.idPrefix + '-' + padId_(nextIdNum);
+      nextIdNum++;
     }
     return schema.map(function (c) {
       return (record[c.key] === undefined || record[c.key] === null) ? '' : record[c.key];

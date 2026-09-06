@@ -39,9 +39,19 @@ function daysBetween_(a, b) {
   return Math.round((db - da) / 86400000);
 }
 
+var MONTH_NAMES_ = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/**
+ * Derives a calendar month name straight from the Date object's own local fields
+ * (getMonth()) rather than Utilities.formatDate(date, 'GMT', 'MMMM'). The old GMT-based
+ * version reinterpreted a date built in the script's timeZone (Africa/Cairo, UTC+2) as if
+ * it were UTC, which shifts local midnight back onto the previous calendar day — silently
+ * correct for most dates, but wrong for any date that falls on the 1st of a month, which
+ * gets misread as the last day of the PREVIOUS month (e.g. Jan 1 read as "December").
+ */
 function monthNameOf_(date) {
   if (!date) return '';
-  return Utilities.formatDate(new Date(date), 'GMT', 'MMMM');
+  return MONTH_NAMES_[new Date(date).getMonth()];
 }
 var MONTH_TO_QUARTER_ = { January: 'Q1', February: 'Q1', March: 'Q1', April: 'Q2', May: 'Q2', June: 'Q2', July: 'Q3', August: 'Q3', September: 'Q3', October: 'Q4', November: 'Q4', December: 'Q4' };
 

@@ -1,7 +1,8 @@
 /**
  * Shared helpers for the client-facing API layer (functions called via google.script.run).
  * Every function the frontend can call is prefixed `api_` by convention so it's obvious
- * from the file which functions form the public contract with ui/JS_App.html.
+ * from the file which functions form the public contract with the frontend (src/ui/*.html,
+ * or JavaScript.html in the manual-deploy copy).
  */
 
 // Sheets the generic CRUD API is allowed to touch. Whitelisted deliberately — the frontend

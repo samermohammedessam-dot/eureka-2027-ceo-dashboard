@@ -148,15 +148,23 @@ function deleteRecordById(sheetName, idValue) {
   }
 }
 
-/** Bulk-appends many records in a single write (used by seeders — far fewer API calls than looping appendRecord). */
+/**
+ * Bulk-appends many records in a single write (used by seeders — far fewer API calls than
+ * looping appendRecord). IDs for records that don't already have one are assigned
+ * sequentially in memory, starting from one scan of the sheet's current max ID — calling
+ * generateId() once per record here would have every record in the batch see the same
+ * (not-yet-updated) sheet and come back with the same "next" ID.
+ */
 function bulkAppendRecords(sheetName, records) {
   if (!records || records.length === 0) return;
   var sheet = getOrCreateSheet(sheetName);
   var schema = getSchema(sheetName);
   var idCol = schema.filter(function (c) { return c.idPrefix; })[0];
+  var nextIdNum = idCol ? nextIdSequenceStart_(sheetName, idCol.idPrefix) : null;
   var rows = records.map(function (record) {
     if (idCol && !record[idCol.key]) {
-      record[idCol.key] = generateId(sheetName, idCol.idPrefix);
+      record[idCol.key] = idCol.idPrefix + '-' + padId_(nextIdNum);
+      nextIdNum++;
     }
     return schema.map(function (c) {
       return (record[c.key] === undefined || record[c.key] === null) ? '' : record[c.key];
@@ -191,8 +199,19 @@ function countBy(records, predicate) {
  * Sequential, human-readable ID generation (e.g. TSK-0001, REV-0037).
  * Scans the existing ID column once per call — fine at this data volume (hundreds to a few
  * thousand rows per sheet) and keeps IDs short and sortable, unlike UUIDs.
+ *
+ * IMPORTANT: this scans the SHEET as it currently stands. A caller that needs several new
+ * IDs in a row (see bulkAppendRecords in SheetService.gs) must NOT call this once per record
+ * before anything has been written — every call would see the same unchanged sheet and
+ * return the same "next" ID. Use nextIdSequenceStart_() once, then increment in memory,
+ * for that case instead.
  */
 function generateId(sheetName, prefix) {
+  return prefix + '-' + padId_(nextIdSequenceStart_(sheetName, prefix));
+}
+
+/** Returns the next free sequence number (not yet formatted/prefixed) for a sheet's ID column. */
+function nextIdSequenceStart_(sheetName, prefix) {
   var sheet = ss_().getSheetByName(sheetName);
   var schema = getSchema(sheetName);
   var idCol = schema.filter(function (c) { return c.idPrefix; })[0];
@@ -208,9 +227,11 @@ function generateId(sheetName, prefix) {
       }
     }
   }
-  var next = max + 1;
-  var padded = ('0000' + next).slice(-4);
-  return prefix + '-' + padded;
+  return max + 1;
+}
+
+function padId_(n) {
+  return ('0000' + n).slice(-4);
 }
 
 // ============================================================
@@ -258,9 +279,19 @@ function daysBetween_(a, b) {
   return Math.round((db - da) / 86400000);
 }
 
+var MONTH_NAMES_ = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/**
+ * Derives a calendar month name straight from the Date object's own local fields
+ * (getMonth()) rather than Utilities.formatDate(date, 'GMT', 'MMMM'). The old GMT-based
+ * version reinterpreted a date built in the script's timeZone (Africa/Cairo, UTC+2) as if
+ * it were UTC, which shifts local midnight back onto the previous calendar day — silently
+ * correct for most dates, but wrong for any date that falls on the 1st of a month, which
+ * gets misread as the last day of the PREVIOUS month (e.g. Jan 1 read as "December").
+ */
 function monthNameOf_(date) {
   if (!date) return '';
-  return Utilities.formatDate(new Date(date), 'GMT', 'MMMM');
+  return MONTH_NAMES_[new Date(date).getMonth()];
 }
 var MONTH_TO_QUARTER_ = { January: 'Q1', February: 'Q1', March: 'Q1', April: 'Q2', May: 'Q2', June: 'Q2', July: 'Q3', August: 'Q3', September: 'Q3', October: 'Q4', November: 'Q4', December: 'Q4' };
 
@@ -510,7 +541,8 @@ function refreshWeeklyCeoSheet_() {
 /**
  * Shared helpers for the client-facing API layer (functions called via google.script.run).
  * Every function the frontend can call is prefixed `api_` by convention so it's obvious
- * from the file which functions form the public contract with JavaScript.html.
+ * from the file which functions form the public contract with the frontend (src/ui/*.html,
+ * or JavaScript.html in the manual-deploy copy).
  */
 
 // Sheets the generic CRUD API is allowed to touch. Whitelisted deliberately — the frontend
@@ -1140,7 +1172,10 @@ function mkAlert_(level, area, message) {
 }
 function pct_(n) { return Math.round(n * 100) + '%'; }
 function numFmt_(n) { return Math.round(Number(n) || 0).toLocaleString(); }
-function fmtDate_(d) { return Utilities.formatDate(new Date(d), 'GMT', 'yyyy-MM-dd'); }
+function fmtDate_(d) {
+  var dt = new Date(d);
+  return dt.getFullYear() + '-' + ('0' + (dt.getMonth() + 1)).slice(-2) + '-' + ('0' + dt.getDate()).slice(-2);
+}
 
 function quarterHasEnded_(quarter, today) {
   var endMonth = { Q1: 2, Q2: 5, Q3: 8, Q4: 11 }[quarter];

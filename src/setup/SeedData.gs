@@ -128,11 +128,10 @@ function getMonthlyStrategyPlan_() {
 
 function seedMasterPlan_() {
   clearDataRows_(SHEETS.MASTER_PLAN);
-  var quarterOf = { January: 'Q1', February: 'Q1', March: 'Q1', April: 'Q2', May: 'Q2', June: 'Q2', July: 'Q3', August: 'Q3', September: 'Q3', October: 'Q4', November: 'Q4', December: 'Q4' };
   var plan = getMonthlyStrategyPlan_();
   var records = plan.map(function (m, i) {
     return {
-      month: m.month, monthNumber: i + 1, quarter: quarterOf[m.month], theme: m.theme,
+      month: m.month, monthNumber: i + 1, quarter: MONTH_TO_QUARTER_[m.month], theme: m.theme,
       primaryMarket: m.primaryMarket, campaign: m.campaign, eventName: m.eventName,
       salesBookingsTarget: m.sales, revenueTarget: m.revenue, growthBudget: m.budget,
       kpiSummary: m.kpis, owner: m.owner

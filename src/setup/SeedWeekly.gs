@@ -12,13 +12,13 @@ function seedWeeklyExecutionAndTasks() {
   var plan = getMonthlyStrategyPlan_();
   var planByMonth = {};
   plan.forEach(function (m) { planByMonth[m.month] = m; });
-  var quarterOf = { January: 'Q1', February: 'Q1', March: 'Q1', April: 'Q2', May: 'Q2', June: 'Q2', July: 'Q3', August: 'Q3', September: 'Q3', October: 'Q4', November: 'Q4', December: 'Q4' };
 
   var weeks = buildWeekDateRanges_(); // [{weekNumber,start,end}] x52
-  // Group weeks by the month that contains their start date.
+  // Group weeks by the month that contains their start date (the canonical rule: Month,
+  // Quarter, Strategic Theme, Campaign and Market are all determined by a week's Start Date).
   var weeksByMonth = {};
   weeks.forEach(function (w) {
-    var monthName = Utilities.formatDate(w.start, 'GMT', 'MMMM');
+    var monthName = monthNameOf_(w.start);
     weeksByMonth[monthName] = weeksByMonth[monthName] || [];
     weeksByMonth[monthName].push(w);
   });
@@ -27,12 +27,12 @@ function seedWeeklyExecutionAndTasks() {
   var actionCursor = {}; // per-month index into that month's actions list, so consecutive weeks get different actions
 
   weeks.forEach(function (w) {
-    var monthName = Utilities.formatDate(w.start, 'GMT', 'MMMM');
+    var monthName = monthNameOf_(w.start);
     var m = planByMonth[monthName];
     var weeksInThisMonth = weeksByMonth[monthName].length;
     w.weekId = 'WK-' + ('00' + w.weekNumber).slice(-2);
     w.month = monthName;
-    w.quarter = quarterOf[monthName];
+    w.quarter = MONTH_TO_QUARTER_[monthName];
     w.strategicTheme = m.theme;
     w.campaign = m.campaign;
     w.primaryMarket = firstMarketToken_(m.primaryMarket);

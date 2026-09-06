@@ -27,8 +27,28 @@ function onOpen() {
     .addItem('Refresh dashboard formulas', 'refreshDashboardSheet')
     .addItem('Recompute traffic lights & calculated fields', 'recomputeAllCalculatedFields')
     .addSeparator()
+    .addItem('🔧 One-time repair: fix seed-data IDs & week mapping', 'confirmRepairExisting2027SeedData')
+    .addSeparator()
     .addItem('⚠ Reset ALL data (danger)', 'confirmResetAllData')
     .addToUi();
+}
+
+/**
+ * Menu entry point for repairExisting2027SeedData() — asks for confirmation first since it
+ * rewrites cells, even though the repair itself only fixes what it finds actually wrong and
+ * is safe to run more than once.
+ */
+function confirmRepairExisting2027SeedData() {
+  var ui = SpreadsheetApp.getUi();
+  var resp = ui.alert(
+    'Repair 2027 seed data?',
+    'Fixes duplicate seeded IDs and corrects Weekly Execution month/quarter/theme/campaign/target ' +
+    'mapping using each week\'s own Start Date. Only touches seeded reference tables and the 52 ' +
+    'weekly rows — Revenue, Expenses, Pipeline, Projects, Clients, Decisions and Risks are never ' +
+    'read or modified. Safe to run more than once. Continue?',
+    ui.ButtonSet.YES_NO
+  );
+  if (resp === ui.Button.YES) repairExisting2027SeedData();
 }
 
 /** One-click full install, in the correct dependency order. Safe to re-run. */
