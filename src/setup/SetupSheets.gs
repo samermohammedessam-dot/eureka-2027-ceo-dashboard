@@ -126,14 +126,14 @@ function buildCeoDashboardSheetShell_() {
   var labels = [
     ['', '', '', '', '', ''],
     ['Metric', 'Value', '', 'Metric', 'Value', ''],
-    ['2027 Revenue Target', '', '', 'Total Pipeline', ''],
-    ['Revenue Actual (Recognized)', '', '', 'Weighted Pipeline', ''],
-    ['Revenue Achievement %', '', '', 'Pipeline Coverage (x)', ''],
-    ['Annual Bookings Target', '', '', 'Cash Collected', ''],
-    ['Bookings Actual', '', '', 'Outstanding Receivables', ''],
-    ['Growth Budget', '', '', 'Win Rate', ''],
-    ['Actual Growth Spend', '', '', 'Deals Won (YTD)', ''],
-    ['Budget Variance', '', '', 'Tasks Completion %', '']
+    ['2027 Revenue Target', '', '', 'Total Pipeline', '', ''],
+    ['Revenue Actual (Recognized)', '', '', 'Weighted Pipeline', '', ''],
+    ['Revenue Achievement %', '', '', 'Pipeline Coverage (x)', '', ''],
+    ['Annual Bookings Target', '', '', 'Cash Collected', '', ''],
+    ['Bookings Actual', '', '', 'Outstanding Receivables', '', ''],
+    ['Growth Budget', '', '', 'Win Rate', '', ''],
+    ['Actual Growth Spend', '', '', 'Deals Won (YTD)', '', ''],
+    ['Budget Variance', '', '', 'Tasks Completion %', '', '']
   ];
   sheet.getRange(2, 1, labels.length, 6).setValues(labels);
   sheet.getRange(2, 1, 1, 6).setFontWeight('bold');
