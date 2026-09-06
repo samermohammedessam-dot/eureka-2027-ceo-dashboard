@@ -469,25 +469,30 @@ function refreshDashboardSheet() {
   var pipeStage = rangeRef_(SHEETS.PIPELINE, 'stage');
   var taskStatus = rangeRef_(SHEETS.TASKS, 'status');
 
-  sheet.getRange('B3').setFormula('=' + REVENUE_TARGET);
-  sheet.getRange('B4').setFormula('=SUM(' + revRecognized + ')');
-  sheet.getRange('B5').setFormula('=IFERROR(B4/B3,0)').setNumberFormat('0%');
-  sheet.getRange('B6').setFormula('=' + ANNUAL_BOOKINGS_TARGET);
-  sheet.getRange('B7').setFormula('=SUMPRODUCT((YEAR(' + revSignDate + ')=' + FISCAL_YEAR + ')*' + revContractValue + ')');
-  sheet.getRange('B8').setFormula('=' + TOTAL_GROWTH_BUDGET_2027); // Growth Budget total (Section 7)
-  sheet.getRange('B9').setFormula('=SUM(' + expActual + ')');
-  sheet.getRange('B10').setFormula('=B8-B9');
+  // Row 3 is the "Metric / Value" header (see buildCeoDashboardSheetShell_ in SetupSheets.gs)
+  // — data starts at row 4. Every cell reference below is deliberately one row below the
+  // metric's row number would suggest at first glance; double-check against the shell's
+  // `labels` array (row 4 = 2027 Revenue Target ... row 11 = Budget Variance / Tasks
+  // Completion %) before changing any of these addresses.
+  sheet.getRange('B4').setFormula('=' + REVENUE_TARGET); // 2027 Revenue Target
+  sheet.getRange('B5').setFormula('=SUM(' + revRecognized + ')'); // Revenue Actual (Recognized)
+  sheet.getRange('B6').setFormula('=IFERROR(B5/B4,0)').setNumberFormat('0%'); // Revenue Achievement %
+  sheet.getRange('B7').setFormula('=' + ANNUAL_BOOKINGS_TARGET); // Annual Bookings Target
+  sheet.getRange('B8').setFormula('=SUMPRODUCT((YEAR(' + revSignDate + ')=' + FISCAL_YEAR + ')*' + revContractValue + ')'); // Bookings Actual
+  sheet.getRange('B9').setFormula('=' + TOTAL_GROWTH_BUDGET_2027); // Growth Budget (Section 7)
+  sheet.getRange('B10').setFormula('=SUM(' + expActual + ')'); // Actual Growth Spend
+  sheet.getRange('B11').setFormula('=B9-B10'); // Budget Variance
 
-  sheet.getRange('E3').setFormula('=SUMIF(' + pipeStage + ',"<>Won",' + pipeValue + ')-SUMIF(' + pipeStage + ',"Lost",' + pipeValue + ')');
-  sheet.getRange('E4').setFormula('=SUMIF(' + pipeStage + ',"<>Won",' + pipeWeighted + ')-SUMIF(' + pipeStage + ',"Lost",' + pipeWeighted + ')');
-  sheet.getRange('E5').setFormula('=IFERROR(E3/' + REVENUE_TARGET + ',0)').setNumberFormat('0.0"x"');
-  sheet.getRange('E6').setFormula('=SUM(' + revCollected + ')');
-  sheet.getRange('E7').setFormula('=SUM(' + revOutstanding + ')');
-  sheet.getRange('E8').setFormula('=IFERROR(COUNTIF(' + pipeStage + ',"Won")/(COUNTIF(' + pipeStage + ',"Won")+COUNTIF(' + pipeStage + ',"Lost")),0)').setNumberFormat('0%');
-  sheet.getRange('E9').setFormula('=COUNTIF(' + pipeStage + ',"Won")');
-  sheet.getRange('E10').setFormula('=IFERROR(COUNTIF(' + taskStatus + ',"Completed")/COUNTA(' + taskStatus + '),0)').setNumberFormat('0%');
+  sheet.getRange('E4').setFormula('=SUMIF(' + pipeStage + ',"<>Won",' + pipeValue + ')-SUMIF(' + pipeStage + ',"Lost",' + pipeValue + ')'); // Total Pipeline
+  sheet.getRange('E5').setFormula('=SUMIF(' + pipeStage + ',"<>Won",' + pipeWeighted + ')-SUMIF(' + pipeStage + ',"Lost",' + pipeWeighted + ')'); // Weighted Pipeline
+  sheet.getRange('E6').setFormula('=IFERROR(E4/' + REVENUE_TARGET + ',0)').setNumberFormat('0.0"x"'); // Pipeline Coverage (x)
+  sheet.getRange('E7').setFormula('=SUM(' + revCollected + ')'); // Cash Collected
+  sheet.getRange('E8').setFormula('=SUM(' + revOutstanding + ')'); // Outstanding Receivables
+  sheet.getRange('E9').setFormula('=IFERROR(COUNTIF(' + pipeStage + ',"Won")/(COUNTIF(' + pipeStage + ',"Won")+COUNTIF(' + pipeStage + ',"Lost")),0)').setNumberFormat('0%'); // Win Rate
+  sheet.getRange('E10').setFormula('=COUNTIF(' + pipeStage + ',"Won")'); // Deals Won (YTD) — a count, not currency, deliberately left out of the EGP formatting loop below
+  sheet.getRange('E11').setFormula('=IFERROR(COUNTIF(' + taskStatus + ',"Completed")/COUNTA(' + taskStatus + '),0)').setNumberFormat('0%'); // Tasks Completion %
 
-  Object.keys({ B3: 1, B4: 1, B6: 1, B7: 1, B8: 1, B9: 1, B10: 1, E3: 1, E4: 1, E6: 1, E7: 1, E9: 1 }).forEach(function (a) {
+  Object.keys({ B4: 1, B5: 1, B7: 1, B8: 1, B9: 1, B10: 1, B11: 1, E4: 1, E5: 1, E7: 1, E8: 1 }).forEach(function (a) {
     sheet.getRange(a).setNumberFormat('#,##0 "EGP"');
   });
 
@@ -511,27 +516,40 @@ function refreshWeeklyCeoSheet_() {
   var taskLight = rangeRef_(SHEETS.TASKS, 'trafficLight');
   var expDate = rangeRef_(SHEETS.EXPENSES, 'date');
   var expActual = rangeRef_(SHEETS.EXPENSES, 'actualAmount');
+  var revDueDate = rangeRef_(SHEETS.REVENUE, 'dueDate');
+  var revOutstanding = rangeRef_(SHEETS.REVENUE, 'outstanding');
   var revCollDate = rangeRef_(SHEETS.REVENUE, 'collectionDate');
   var revCollAmt = rangeRef_(SHEETS.REVENUE, 'amountCollected');
   var revSignDate = rangeRef_(SHEETS.REVENUE, 'contractSigningDate');
   var revContractValue = rangeRef_(SHEETS.REVENUE, 'contractValue');
 
+  // Row 3 is the "This Week Metric / Value / End of Week Metric / Value" header (see
+  // buildWeeklyCeoSheetShell_ in SetupSheets.gs) — data starts at row 4, so $B$4 (not $B$3)
+  // is the cell every other formula below looks up the current week's ID from.
   var currentWeekId = '=INDEX(' + weekIdCol + ',MATCH(1,(TODAY()>=' + weekStart + ')*(TODAY()<=' + weekEnd + '),0))';
-  sheet.getRange('B3').setFormula(currentWeekId);
-  sheet.getRange('B4').setFormula('=IFERROR(INDEX(' + weekSales + ',MATCH($B$3,' + weekIdCol + ',0)),0)').setNumberFormat('#,##0 "EGP"');
-  sheet.getRange('B5').setFormula('=SUMIFS(' + revCollAmt + ',' + revCollDate + ',">="&INDEX(' + weekStart + ',MATCH($B$3,' + weekIdCol + ',0)),' + revCollDate + ',"<="&INDEX(' + weekEnd + ',MATCH($B$3,' + weekIdCol + ',0)))').setNumberFormat('#,##0 "EGP"');
-  sheet.getRange('B6').setFormula('=COUNTIFS(' + taskWeekId + ',$B$3,' + taskPriority + ',"Critical")');
-  sheet.getRange('B7').setFormula('=COUNTIFS(' + taskWeekId + ',$B$3,' + taskStatus + ',"Blocked")');
-  sheet.getRange('B8').setFormula('=COUNTIFS(' + taskWeekId + ',$B$3,' + taskLight + ',"RED")');
-  sheet.getRange('B9').setFormula('=IFERROR(INDEX(' + weekBudget + ',MATCH($B$3,' + weekIdCol + ',0)),0)').setNumberFormat('#,##0 "EGP"');
+  sheet.getRange('B4').setFormula(currentWeekId); // Current Week ID
+  sheet.getRange('B5').setFormula('=IFERROR(INDEX(' + weekSales + ',MATCH($B$4,' + weekIdCol + ',0)),0)').setNumberFormat('#,##0 "EGP"'); // Sales Target
+  // Expected Collections = receivables DUE this week (outstanding amounts whose due date
+  // falls in the current week) — matches the web app's WeeklyApi.gs definition. The
+  // previous version summed amountCollected by collectionDate instead, which is what was
+  // actually COLLECTED, not what's expected — that number now correctly lives in "Revenue
+  // Collected" below instead.
+  sheet.getRange('B6').setFormula('=SUMIFS(' + revOutstanding + ',' + revDueDate + ',">="&INDEX(' + weekStart + ',MATCH($B$4,' + weekIdCol + ',0)),' + revDueDate + ',"<="&INDEX(' + weekEnd + ',MATCH($B$4,' + weekIdCol + ',0)))').setNumberFormat('#,##0 "EGP"'); // Expected Collections
+  sheet.getRange('B7').setFormula('=COUNTIFS(' + taskWeekId + ',$B$4,' + taskPriority + ',"Critical")'); // Critical Tasks
+  sheet.getRange('B8').setFormula('=COUNTIFS(' + taskWeekId + ',$B$4,' + taskStatus + ',"Blocked")'); // Blocked Tasks
+  sheet.getRange('B9').setFormula('=COUNTIFS(' + taskWeekId + ',$B$4,' + taskLight + ',"RED")'); // Overdue Tasks
+  sheet.getRange('B10').setFormula('=IFERROR(INDEX(' + weekBudget + ',MATCH($B$4,' + weekIdCol + ',0)),0)').setNumberFormat('#,##0 "EGP"'); // Budget Planned This Week
 
-  sheet.getRange('D3').setFormula('=COUNTIFS(' + taskWeekId + ',$B$3)');
-  sheet.getRange('D4').setFormula('=COUNTIFS(' + taskWeekId + ',$B$3,' + taskStatus + ',"Completed")');
-  sheet.getRange('D5').setFormula('=IFERROR(D4/D3,0)').setNumberFormat('0%');
-  sheet.getRange('D6').setFormula('=COUNTIFS(' + taskWeekId + ',$B$3,' + taskStatus + ',"<>Completed",' + taskDue + ',"<"&TODAY())');
-  sheet.getRange('D7').setFormula('=SUMIFS(' + expActual + ',' + expDate + ',">="&INDEX(' + weekStart + ',MATCH($B$3,' + weekIdCol + ',0)),' + expDate + ',"<="&INDEX(' + weekEnd + ',MATCH($B$3,' + weekIdCol + ',0)))').setNumberFormat('#,##0 "EGP"');
-  sheet.getRange('D8').setFormula('=B5');
-  sheet.getRange('D9').setFormula('=SUMIFS(' + revContractValue + ',' + revSignDate + ',">="&INDEX(' + weekStart + ',MATCH($B$3,' + weekIdCol + ',0)),' + revSignDate + ',"<="&INDEX(' + weekEnd + ',MATCH($B$3,' + weekIdCol + ',0)))').setNumberFormat('#,##0 "EGP"');
+  sheet.getRange('D4').setFormula('=COUNTIFS(' + taskWeekId + ',$B$4)'); // Tasks Planned
+  sheet.getRange('D5').setFormula('=COUNTIFS(' + taskWeekId + ',$B$4,' + taskStatus + ',"Completed")'); // Tasks Completed
+  sheet.getRange('D6').setFormula('=IFERROR(D5/D4,0)').setNumberFormat('0%'); // Completion %
+  sheet.getRange('D7').setFormula('=COUNTIFS(' + taskWeekId + ',$B$4,' + taskStatus + ',"<>Completed",' + taskDue + ',"<"&TODAY())'); // Tasks Overdue
+  sheet.getRange('D8').setFormula('=SUMIFS(' + expActual + ',' + expDate + ',">="&INDEX(' + weekStart + ',MATCH($B$4,' + weekIdCol + ',0)),' + expDate + ',"<="&INDEX(' + weekEnd + ',MATCH($B$4,' + weekIdCol + ',0)))').setNumberFormat('#,##0 "EGP"'); // Spend This Week
+  // Revenue Collected = actually collected this week (amountCollected by collectionDate) —
+  // previously this cell just pointed at "=B5" (the mislabeled Expected Collections cell)
+  // instead of having its own formula.
+  sheet.getRange('D9').setFormula('=SUMIFS(' + revCollAmt + ',' + revCollDate + ',">="&INDEX(' + weekStart + ',MATCH($B$4,' + weekIdCol + ',0)),' + revCollDate + ',"<="&INDEX(' + weekEnd + ',MATCH($B$4,' + weekIdCol + ',0)))').setNumberFormat('#,##0 "EGP"'); // Revenue Collected
+  sheet.getRange('D10').setFormula('=SUMIFS(' + revContractValue + ',' + revSignDate + ',">="&INDEX(' + weekStart + ',MATCH($B$4,' + weekIdCol + ',0)),' + revSignDate + ',"<="&INDEX(' + weekEnd + ',MATCH($B$4,' + weekIdCol + ',0)))').setNumberFormat('#,##0 "EGP"'); // Bookings
 }
 
 // ============================================================

@@ -141,9 +141,9 @@ function buildCeoDashboardSheetShell_() {
     ['Budget Variance', '', '', 'Tasks Completion %', '', '']
   ];
   sheet.getRange(2, 1, labels.length, 6).setValues(labels);
-  sheet.getRange(2, 1, 1, 6).setFontWeight('bold');
-  sheet.getRange(3, 1, 8, 1).setFontWeight('bold');
-  sheet.getRange(3, 4, 8, 1).setFontWeight('bold');
+  sheet.getRange(3, 1, 1, 6).setFontWeight('bold'); // header row ("Metric / Value ...", row 3 — row 2 above it is a blank spacer)
+  sheet.getRange(4, 1, 8, 1).setFontWeight('bold'); // left-hand metric labels, rows 4-11
+  sheet.getRange(4, 4, 8, 1).setFontWeight('bold'); // right-hand metric labels, rows 4-11
   sheet.getRange('A13').setValue('This sheet is refreshed by Eureka 2027 menu → "Refresh dashboard formulas". Live drill-down, charts and weekly review are in the web app.').setFontStyle('italic');
 }
 
@@ -165,9 +165,9 @@ function buildWeeklyCeoSheetShell_() {
     ['Budget Planned This Week', '', 'Bookings', '']
   ];
   sheet.getRange(2, 1, labels.length, 4).setValues(labels);
-  sheet.getRange(2, 1, 1, 4).setFontWeight('bold');
-  sheet.getRange(3, 1, 7, 1).setFontWeight('bold');
-  sheet.getRange(3, 3, 7, 1).setFontWeight('bold');
+  sheet.getRange(3, 1, 1, 4).setFontWeight('bold'); // header row (row 3 — row 2 above it is a blank spacer)
+  sheet.getRange(4, 1, 7, 1).setFontWeight('bold'); // "This Week" labels, rows 4-10
+  sheet.getRange(4, 3, 7, 1).setFontWeight('bold'); // "End of Week" labels, rows 4-10
   sheet.setColumnWidths(1, 4, 220);
 }
 
