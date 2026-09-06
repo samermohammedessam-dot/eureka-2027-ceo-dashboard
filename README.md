@@ -10,6 +10,18 @@ and management team.
 - **Frontend:** a single-page app served by Apps Script's `HtmlService` (`src/ui/*.html`) —
   looks and behaves like a management SaaS dashboard, not a spreadsheet in a browser.
 
+This repository ships **two equivalent copies of the same application**:
+
+| Folder | Use it if… | File count |
+|---|---|---|
+| `src/` | You use `clasp` + git to develop and deploy (multi-file, organized by concern) | 30 files |
+| `manual-deploy/` | You want to copy-paste directly into the Apps Script web editor — no clasp, no terminal, no npm | 7 files |
+
+Both contain 100% of the same functionality — `manual-deploy/` is `src/` with every `.gs`
+file concatenated into 3 files and every `.html` partial concatenated into 3 files, so
+copy-paste deployment has the fewest possible files to create. **If you're not using
+clasp/GitHub/terminal, skip straight to Section 3A below and use only `manual-deploy/`.**
+
 ---
 
 ## 1. Architecture
@@ -137,11 +149,94 @@ CRUD write from the web app, and on demand from the spreadsheet menu.
 
 ---
 
-## 3. Deployment instructions
+## 3A. Manual deployment (no clasp, no terminal, no GitHub)
 
-Everything code-related is already built and sitting in this repository. Three steps
-require *your* Google account because Apps Script projects live under a Google identity —
-there's no way to provision that from outside:
+Everything you need is in the **`manual-deploy/`** folder — 7 files total, meant to be
+copy-pasted directly into the Apps Script web editor at script.google.com. Ignore the
+`src/` folder entirely for this path; it's the same application split into more files for
+git/clasp-based development.
+
+### FILES TO CREATE IN GOOGLE APPS SCRIPT
+
+| # | Filename (exactly as typed in the Apps Script editor) | Type | Source in this repo |
+|---|---|---|---|
+| 1 | `Code` | Script | `manual-deploy/Code.gs` |
+| 2 | `Setup` | Script | `manual-deploy/Setup.gs` |
+| 3 | `Backend` | Script | `manual-deploy/Backend.gs` |
+| 4 | `Index` | HTML | `manual-deploy/Index.html` |
+| 5 | `CSS` | HTML | `manual-deploy/CSS.html` |
+| 6 | `JavaScript` | HTML | `manual-deploy/JavaScript.html` |
+| 7 | *(manifest — see note below)* | — | `manual-deploy/appsscript.json` |
+
+*Apps Script auto-creates a file named `Code.gs` in every new project — just open it and
+replace its contents rather than creating a duplicate.* When you click **+ → Script** for
+files 2–3, Apps Script appends `.gs` automatically; when you click **+ → HTML** for files
+4–6, it appends `.html` automatically — type only the base name shown above.
+
+### IGNORE these repository files/folders for manual deployment
+
+- The entire `src/` folder (30 files) — that's the clasp/developer copy of the exact same
+  app, not needed if you're pasting manually.
+- `.clasp.json.example` — only relevant to the clasp workflow.
+- `.gitignore` — a git-only file, irrelevant to Apps Script.
+
+### Steps
+
+1. **Create the spreadsheet.** Go to [sheets.google.com](https://sheets.google.com) → new
+   blank spreadsheet → name it "Eureka 2027 — CEO Execution System".
+2. **Open the script editor.** In the Sheet: **Extensions → Apps Script**. This opens a
+   bound script project with one default file, `Code.gs`.
+3. **Replace `Code.gs`.** Open the `Code` file already there, delete its placeholder
+   content, and paste in the full contents of `manual-deploy/Code.gs`.
+4. **Add `Setup.gs`.** Click the **+** next to "Files" → **Script**. Name it `Setup` (the
+   `.gs` extension is added automatically). Paste in `manual-deploy/Setup.gs`.
+5. **Add `Backend.gs`.** Same as step 4, named `Backend`, pasted from
+   `manual-deploy/Backend.gs`.
+6. **Add `Index.html`.** Click **+ → HTML**. Name it `Index`. Paste in
+   `manual-deploy/Index.html`.
+7. **Add `CSS.html`.** Click **+ → HTML**. Name it `CSS`. Paste in `manual-deploy/CSS.html`.
+8. **Add `JavaScript.html`.** Click **+ → HTML**. Name it `JavaScript`. Paste in
+   `manual-deploy/JavaScript.html`.
+9. **(Optional) Set the manifest.** Click the gear icon (**Project Settings**) → check
+   **"Show 'appsscript.json' manifest file in editor"**. A new `appsscript.json` file
+   appears in the file list — open it and replace its contents with
+   `manual-deploy/appsscript.json`. This step is optional: it only controls who can access
+   the deployed web app by default (see Step 13); you can also set that directly in the
+   deployment dialog without touching this file.
+10. **Save.** `Ctrl+S` / `Cmd+S`, or the 💾 icon.
+11. **Install the data model.** Close the script editor tab and reload the Google Sheet
+    tab. A new **Eureka 2027** menu appears at the top. Click it, then run, top to bottom:
+    - **1. Build sheet structure**
+    - **2. Apply validation & formatting**
+    - **3. Seed master + strategy data**
+
+    The first click will show Google's standard authorization prompt ("This app isn't
+    verified" is expected for a script you just wrote yourself — click **Advanced → Go to
+    [project name] (unsafe)** → **Allow**). This is Google asking your permission for the
+    script to edit *your own* spreadsheet; nothing leaves your account.
+
+    (Equivalent one-click shortcut: in the script editor, select the `fullInstall`
+    function from the function dropdown at the top and click ▶ **Run** — this does all
+    three steps at once.)
+12. **Deploy the web app.** Back in the script editor: **Deploy → New deployment** → click
+    the gear next to "Select type" → **Web app**. Set **Execute as: Me**, and **Who has
+    access:** *Anyone within [your domain]* (Workspace accounts) or *Anyone with the link*
+    (personal Gmail — see Section 6, Data Safety, for what that means). Click **Deploy**,
+    authorize again if prompted, then copy the web app URL.
+13. **Share the URL** with the CEO and management team. They open the link directly —
+    they do not need edit access to the underlying Sheet.
+
+To update the app later: edit the relevant file(s) in the script editor, save, then
+**Deploy → Manage deployments → ✏️ (edit) → Version: New version → Deploy**. Saving alone
+does not push changes to an already-deployed web app URL.
+
+---
+
+## 3B. Deployment instructions (clasp / developer workflow)
+
+Use this path only if you're comfortable with git, npm, and a terminal — it develops from
+the `src/` folder instead of `manual-deploy/`. If you followed Section 3A above, skip this
+entirely.
 
 ### Step A — Create the spreadsheet and script project (5 minutes)
 
@@ -308,7 +403,16 @@ dashboard lie to the CEO on day one — better to start at zero and watch it fil
 ## 8. Repository layout
 
 ```
-src/
+manual-deploy/              Flattened copy for manual paste into script.google.com (Section 3A)
+  Code.gs                   Constants + SheetSchema + doGet()/onOpen()/fullInstall()
+  Setup.gs                  Sheet creation, validation/formatting, all seeding
+  Backend.gs                Data access, calculated fields, every api_* function
+  Index.html                SPA shell
+  CSS.html                  Design system
+  JavaScript.html           All frontend JS (state, views, CRUD forms)
+  appsscript.json           Manifest (execution + access mode)
+
+src/                        Same application, organized by concern for clasp/git development (Section 3B)
   appsscript.json          Apps Script manifest (execution + access mode)
   Code.gs                  doGet(), onOpen() menu, include(), fullInstall()
   config/

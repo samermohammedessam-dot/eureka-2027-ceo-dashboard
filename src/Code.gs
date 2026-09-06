@@ -4,7 +4,7 @@
 
 function doGet(e) {
   var page = (e && e.parameter && e.parameter.page) || 'Index';
-  var template = HtmlService.createTemplateFromFile('ui/' + page);
+  var template = HtmlService.createTemplateFromFile(page);
   return template.evaluate()
     .setTitle('Eureka 2027 — CEO Execution System')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
@@ -12,7 +12,7 @@ function doGet(e) {
     .setFaviconUrl('https://www.gstatic.com/images/branding/product/1x/sheets_48dp.png');
 }
 
-/** Used inside HTML templates: <?!= include('ui/JS_App'); ?> */
+/** Used inside Index.html: <?!= include('CSS'); ?> and <?!= include('JavaScript'); ?> */
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }

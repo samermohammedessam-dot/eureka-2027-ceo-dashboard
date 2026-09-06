@@ -6,14 +6,18 @@
 
 // Sheets the generic CRUD API is allowed to touch. Whitelisted deliberately — the frontend
 // passes a sheet name as a string, so this stops any arbitrary sheet from being written to.
-var GENERIC_CRUD_SHEETS = [
-  SHEETS.TARGET_ACCOUNTS, SHEETS.PARTNERSHIPS, SHEETS.ACADEMY, SHEETS.CASE_STUDIES,
-  SHEETS.DIGITAL_ROADMAP, SHEETS.DECISIONS, SHEETS.RISKS, SHEETS.PROJECTS, SHEETS.CLIENTS,
-  SHEETS.TEAM, SHEETS.MARKETS, SHEETS.BUSINESS_UNITS
-];
+// Built lazily (not a top-level array literal) so it never depends on file load order —
+// safe even if this file's code is pasted/merged ahead of the file that defines SHEETS.
+function genericCrudSheets_() {
+  return [
+    SHEETS.TARGET_ACCOUNTS, SHEETS.PARTNERSHIPS, SHEETS.ACADEMY, SHEETS.CASE_STUDIES,
+    SHEETS.DIGITAL_ROADMAP, SHEETS.DECISIONS, SHEETS.RISKS, SHEETS.PROJECTS, SHEETS.CLIENTS,
+    SHEETS.TEAM, SHEETS.MARKETS, SHEETS.BUSINESS_UNITS
+  ];
+}
 
 function assertGenericSheetAllowed_(sheetName) {
-  if (GENERIC_CRUD_SHEETS.indexOf(sheetName) === -1) {
+  if (genericCrudSheets_().indexOf(sheetName) === -1) {
     throw new Error('Sheet not permitted for generic CRUD: ' + sheetName);
   }
 }
