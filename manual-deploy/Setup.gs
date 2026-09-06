@@ -751,7 +751,40 @@ function buildWeekDateRanges_() {
  *  - Idempotent — every step first checks whether anything is actually wrong, so running it
  *    a second (or fifth) time is harmless and will simply report nothing left to fix.
  */
+/**
+ * Fails fast with a specific, actionable message instead of a cryptic "X is not defined"
+ * ReferenceError. By far the most common cause of that error in a copy-paste (no clasp)
+ * deployment is that one of the two other files wasn't pasted in COMPLETELY — a partial
+ * selection, or a paste that silently got cut off partway through a very long file. Each
+ * name checked here is either near the very start or the very end of the file it lives in,
+ * so if it resolves, that whole file made it in; if it doesn't, this says exactly which file
+ * to re-paste rather than leaving you to guess from a bare ReferenceError and a line number.
+ *
+ * (In the multi-file /src project these same symbols live in config/Constants.gs,
+ * config/SheetSchema.gs, Code.gs, data/SheetService.gs, api/Compute.gs and api/LookupsApi.gs
+ * respectively — this check only matters for the 3-file manual-deploy build, where several
+ * of those get concatenated into one file and a partial paste of that file is easy to miss.)
+ */
+function assertManualDeployFilesLoaded_() {
+  var missing = [];
+  if (typeof SHEETS === 'undefined') missing.push('SHEETS (defined near the top of Code.gs)');
+  if (typeof getHeaders === 'undefined') missing.push('getHeaders (defined in the SheetSchema section of Code.gs)');
+  if (typeof resetAllData === 'undefined') missing.push('resetAllData (the last function in Code.gs)');
+  if (typeof bulkAppendRecords === 'undefined') missing.push('bulkAppendRecords (defined near the top of Backend.gs)');
+  if (typeof MONTH_TO_QUARTER_ === 'undefined') missing.push('MONTH_TO_QUARTER_ (defined in the Compute section of Backend.gs)');
+  if (typeof api_getLookups === 'undefined') missing.push('api_getLookups (the last function in Backend.gs)');
+  if (missing.length) {
+    throw new Error(
+      'Cannot run: the following expected to already be loaded but are missing — ' + missing.join('; ') + '. ' +
+      'This means Code.gs and/or Backend.gs were not pasted in FULLY. Fix: in the Apps Script editor, open ' +
+      'each of those two files, select all (Ctrl/Cmd+A), delete everything, paste the complete current ' +
+      'contents of manual-deploy/Code.gs and manual-deploy/Backend.gs, save each file (Ctrl/Cmd+S), then try again.'
+    );
+  }
+}
+
 function repairExisting2027SeedData() {
+  assertManualDeployFilesLoaded_();
   var report = [];
   report.push(dedupeAndRenumberIds_(SHEETS.TEAM, 'teamId', 'EMP'));
   report.push(dedupeAndRenumberIds_(SHEETS.MARKETS, 'marketId', 'MKT'));
