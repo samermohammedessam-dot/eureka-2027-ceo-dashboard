@@ -470,10 +470,21 @@ function refreshDashboardSheet() {
   var taskStatus = rangeRef_(SHEETS.TASKS, 'status');
 
   // Row 3 is the "Metric / Value" header (see buildCeoDashboardSheetShell_ in SetupSheets.gs)
-  // — data starts at row 4. Every cell reference below is deliberately one row below the
-  // metric's row number would suggest at first glance; double-check against the shell's
-  // `labels` array (row 4 = 2027 Revenue Target ... row 11 = Budget Variance / Tasks
-  // Completion %) before changing any of these addresses.
+  // — data starts at row 4. Re-assert the header text every time this runs (not just when
+  // the shell is first built): this menu item is meant to be run on its own, repeatedly,
+  // without rebuilding the sheet first, so it must never depend on row 3 already being
+  // correct from some earlier run. setValue() replaces any stale formula/value left over
+  // from a previous version of this function, and '@' forces plain-text display regardless
+  // of whatever number format that stale content carried.
+  sheet.getRange('A3').setValue('Metric').setNumberFormat('@');
+  sheet.getRange('B3').setValue('Value').setNumberFormat('@');
+  sheet.getRange('D3').setValue('Metric').setNumberFormat('@');
+  sheet.getRange('E3').setValue('Value').setNumberFormat('@');
+
+  // Every cell reference below is deliberately one row below the metric's row number would
+  // suggest at first glance; double-check against the shell's `labels` array (row 4 = 2027
+  // Revenue Target ... row 11 = Budget Variance / Tasks Completion %) before changing any of
+  // these addresses.
   sheet.getRange('B4').setFormula('=' + REVENUE_TARGET); // 2027 Revenue Target
   sheet.getRange('B5').setFormula('=SUM(' + revRecognized + ')'); // Revenue Actual (Recognized)
   sheet.getRange('B6').setFormula('=IFERROR(B5/B4,0)').setNumberFormat('0%'); // Revenue Achievement %
@@ -525,7 +536,14 @@ function refreshWeeklyCeoSheet_() {
 
   // Row 3 is the "This Week Metric / Value / End of Week Metric / Value" header (see
   // buildWeeklyCeoSheetShell_ in SetupSheets.gs) — data starts at row 4, so $B$4 (not $B$3)
-  // is the cell every other formula below looks up the current week's ID from.
+  // is the cell every other formula below looks up the current week's ID from. Re-assert the
+  // header text every time this runs, the same way refreshDashboardSheet() does above, so it
+  // self-heals regardless of what an earlier version of this function may have left behind.
+  sheet.getRange('A3').setValue('This Week Metric').setNumberFormat('@');
+  sheet.getRange('B3').setValue('Value').setNumberFormat('@');
+  sheet.getRange('C3').setValue('End of Week Metric').setNumberFormat('@');
+  sheet.getRange('D3').setValue('Value').setNumberFormat('@');
+
   var currentWeekId = '=INDEX(' + weekIdCol + ',MATCH(1,(TODAY()>=' + weekStart + ')*(TODAY()<=' + weekEnd + '),0))';
   sheet.getRange('B4').setFormula(currentWeekId); // Current Week ID
   sheet.getRange('B5').setFormula('=IFERROR(INDEX(' + weekSales + ',MATCH($B$4,' + weekIdCol + ',0)),0)').setNumberFormat('#,##0 "EGP"'); // Sales Target
