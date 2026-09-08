@@ -15,19 +15,37 @@ function getOrCreateSheet(name) {
 
 /**
  * Reads all data rows of a sheet as an array of plain objects keyed by schema `key`.
- * Empty trailing rows are skipped. Adds `_row` (1-based sheet row number) to every object
- * so callers can write updates back without re-scanning.
+ * Adds `_row` (1-based sheet row number) to every object so callers can write updates back
+ * without re-scanning.
+ *
+ * getLastRow() is NOT a reliable "how many real records" signal on this project: setup
+ * forces every sheet to at least 500 rows and applies checkbox data validation to every
+ * boolean column across all of them (see runSetupValidation in SetupSheets.gs), and
+ * insertCheckboxes() writes a real FALSE into every one of those cells — which counts as
+ * content for getLastRow(), and does NOT stringify to '' (`[false].join('')` is `"false"`,
+ * not `""`), so the old "skip fully-blank rows" check let hundreds of placeholder rows
+ * through on any sheet with a boolean column that isn't otherwise re-seeded (Projects,
+ * Case Studies, Decisions in particular sit at getLastRow()===500 indefinitely since
+ * nothing ever seeds/clears them). The real signal for "is this a record" is the sheet's
+ * own primary ID column: a row a user or seeder actually created always has one, a leftover
+ * formatting row never does.
  */
 function readAllRecords(sheetName) {
   var sheet = ss_().getSheetByName(sheetName);
   if (!sheet || sheet.getLastRow() < 2) return [];
   var schema = getSchema(sheetName);
   var numCols = schema.length;
+  var idCol = schema.filter(function (c) { return c.idPrefix; })[0];
+  var idColIndex = idCol ? schema.indexOf(idCol) : -1;
   var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, numCols).getValues();
   var records = [];
   for (var r = 0; r < values.length; r++) {
     var row = values[r];
-    if (row.join('') === '') continue; // fully blank row
+    if (idColIndex > -1) {
+      if (row[idColIndex] === '' || row[idColIndex] === null || row[idColIndex] === undefined) continue; // no ID => not a real record
+    } else if (row.join('') === '') {
+      continue; // sheets with no ID column (Master Plan, etc.): fall back to "fully blank row"
+    }
     var obj = { _row: r + 2 };
     for (var c = 0; c < schema.length; c++) {
       obj[schema[c].key] = row[c];

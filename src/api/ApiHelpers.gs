@@ -29,13 +29,18 @@ function stripRowMeta_(record) {
   return clean;
 }
 
+// Pagination controls, not filter criteria — applyFilters_ must never try to match a record
+// field against these (no record has a "page" or "pageSize" column, so a naive filter would
+// discard every row). See paginate_() in this file.
+var PAGINATION_KEYS_ = { page: true, pageSize: true };
+
 function applyFilters_(records, filters) {
   if (!filters) return records;
   return records.filter(function (r) {
     for (var key in filters) {
       var val = filters[key];
       if (val === undefined || val === null || val === '') continue;
-      if (key === '_search') continue;
+      if (key === '_search' || PAGINATION_KEYS_[key]) continue;
       if (String(r[key]) !== String(val)) return false;
     }
     if (filters._search) {
@@ -54,4 +59,33 @@ function safeCall_(fn) {
     Logger.log('API error: ' + err + '\n' + (err && err.stack));
     return { ok: false, error: String(err && err.message || err) };
   }
+}
+
+/**
+ * Performance Sprint instrumentation: writes a timing line to the execution log (visible in
+ * the Apps Script editor's Executions view) so slow phases can be identified from real runs.
+ * Deliberately just Logger.log — no sheet writes, no state — safe to leave in permanently.
+ */
+function logTiming_(label, ms) {
+  Logger.log('[perf] ' + label + ': ' + ms + 'ms');
+}
+
+/**
+ * Opt-in server-side pagination: only slices when the caller actually asks for a page (see
+ * each api_get* that supports it) — omit `page` entirely and you get the old plain-array
+ * behavior, so existing narrow/filtered call sites (e.g. "tasks for this one week") are
+ * completely unaffected.
+ */
+function paginate_(records, filters) {
+  var page = Math.max(1, parseInt((filters && filters.page) || 1, 10) || 1);
+  var pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, parseInt((filters && filters.pageSize) || DEFAULT_PAGE_SIZE, 10) || DEFAULT_PAGE_SIZE));
+  var total = records.length;
+  var start = (page - 1) * pageSize;
+  return {
+    records: records.slice(start, start + pageSize),
+    total: total,
+    page: page,
+    pageSize: pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize))
+  };
 }

@@ -142,6 +142,16 @@ var TRAFFIC_LIGHT = { RED: 'RED', YELLOW: 'YELLOW', GREEN: 'GREEN' };
 
 var CACHE_TTL_SECONDS = 90;
 
+// ---- Performance: whole-payload caches (Performance Sprint) ----
+// These cache the fully-assembled JSON a client receives, not raw sheet rows — cheaper and
+// simpler to invalidate than per-sheet caching once several sheets feed one response.
+var DASHBOARD_CACHE_KEY = 'perf_dashboard_bootstrap_v1';
+var DASHBOARD_CACHE_TTL_SECONDS = 240; // 4 minutes
+var LOOKUPS_CACHE_KEY = 'perf_lookups_v1';
+var LOOKUPS_CACHE_TTL_SECONDS = 300; // 5 minutes
+var DEFAULT_PAGE_SIZE = 50;
+var MAX_PAGE_SIZE = 100;
+
 // ============================================================
 // SOURCE: config/SheetSchema.gs
 // ============================================================

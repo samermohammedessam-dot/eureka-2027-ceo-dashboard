@@ -5,7 +5,18 @@
  * Both attach to the same global `App` object defined here.
  */
 var App = {
-  state: { lookups: null, charts: {}, currentView: 'dashboard' },
+  state: { lookups: null, charts: {}, currentView: 'dashboard', cache: {}, pending: {} },
+  CACHE_TTL_MS: 60000, // Performance Sprint: a view fetched again within this window is served from memory, not the server
+
+  // ---- Performance instrumentation: performance.now() markers, logged to the console.
+  // Not surfaced in the UI — open devtools to see them. Safe to leave in permanently. ----
+  perf: { marks: {} },
+  mark: function (name) {
+    var t = (window.performance && performance.now) ? performance.now() : Date.now();
+    this.perf.marks[name] = t;
+    console.log('[perf] ' + name + ': ' + t.toFixed(0) + 'ms since navigation start');
+    return t;
+  },
 
   NAV: [
     { id: 'dashboard', label: 'Dashboard', icon: '◆' },
@@ -27,10 +38,14 @@ var App = {
   ],
 
   init: function () {
+    if (this._initStarted) return; // guard against a stray duplicate init call re-fetching everything
+    this._initStarted = true;
+    this.mark('shellDisplayed'); // sidebar/topbar/CSS are already painted by the time this JS runs — see Index.html
     this.renderNav();
     var self = this;
     this.call('api_getLookups').then(function (res) {
       self.state.lookups = res.ok ? res.data : {};
+      self.mark('lookupsReceived');
       self.navigate('dashboard');
     });
   },
@@ -46,6 +61,19 @@ var App = {
     });
   },
 
+  // Skeleton placeholders shown the instant a nav item is clicked, before any server response
+  // arrives — keeps the interface feeling responsive even on a slow connection (Section 9,
+  // "progressive visual loading": Phase 1 shell is already on screen, this is Phase 2's
+  // placeholder ahead of the real KPI cards/table landing in the same slot).
+  SKELETON: '<div class="kpi-grid">' +
+    '<div class="kpi-card"><div class="label">&nbsp;</div><div class="value">···</div></div>'.repeat(4) +
+    '</div><div class="card"><div class="loading">Loading…</div></div>',
+
+  // Re-navigating to the same view (e.g. after a CRUD save calls App.navigate(currentView)
+  // to refresh it) is intentionally NOT short-circuited here — the render function itself is
+  // cheap, and the actual expensive part (the server round trip inside App.call) is already
+  // deduped/cached there, with writes clearing that cache so a post-save refresh always
+  // fetches the new data instead of quietly reusing something stale.
   navigate: function (viewId) {
     this.state.currentView = viewId;
     document.querySelectorAll('#nav-list .item').forEach(function (i) {
@@ -54,15 +82,40 @@ var App = {
     var nav = this.NAV.filter(function (n) { return n.id === viewId; })[0];
     document.getElementById('page-title').textContent = nav ? nav.label : '';
     document.getElementById('filters').innerHTML = '';
-    document.getElementById('content').innerHTML = '<div class="loading">Loading…</div>';
+    document.getElementById('content').innerHTML = this.SKELETON;
     var renderer = this.Views[viewId];
     if (renderer) renderer(); else this.setContent('<div class="empty-state">View not found.</div>');
   },
 
-  // ---- Server call wrapper: promisifies google.script.run and unwraps the {ok,data} envelope. ----
+  /**
+   * Server call wrapper: promisifies google.script.run, unwraps the {ok,data} envelope, and
+   * (Performance Sprint) adds a short in-memory cache + in-flight de-duplication for read
+   * calls (functions named "api_get..."): navigating back to a view already loaded within
+   * CACHE_TTL_MS resolves instantly with no network round trip, and two callers asking for
+   * the exact same data at the same moment (e.g. a double click) share one request instead
+   * of firing two. Any write call (a function named "api_save..." or "api_delete...") clears
+   * the whole cache afterward — simplest correct invalidation policy: a write can affect more
+   * than one view's aggregates (e.g. a task edit changes both the Tasks table and the
+   * Dashboard's completion %), so rather than hand-maintain which cache entries a given write
+   * can touch, just drop all of them and let
+   * the next visit to each view re-fetch once.
+   */
   call: function (fnName) {
     var args = Array.prototype.slice.call(arguments, 1);
-    return new Promise(function (resolve) {
+    var isRead = fnName.indexOf('api_get') === 0;
+    var isWrite = fnName.indexOf('api_save') === 0 || fnName.indexOf('api_delete') === 0;
+    var key = fnName + '|' + JSON.stringify(args);
+    var self = this;
+
+    if (isRead) {
+      var cached = this.state.cache[key];
+      if (cached && (Date.now() - cached.ts) < this.CACHE_TTL_MS) {
+        return Promise.resolve(cached.data);
+      }
+      if (this.state.pending[key]) return this.state.pending[key];
+    }
+
+    var promise = new Promise(function (resolve) {
       if (typeof google === 'undefined' || !google.script) {
         resolve({ ok: false, error: 'Not running inside Apps Script (google.script.run unavailable).' });
         return;
@@ -71,11 +124,42 @@ var App = {
         .withSuccessHandler(function (res) { resolve(res); })
         .withFailureHandler(function (err) { resolve({ ok: false, error: String(err) }); });
       runner[fnName].apply(runner, args);
+    }).then(function (res) {
+      if (isRead) {
+        delete self.state.pending[key];
+        if (res && res.ok) self.state.cache[key] = { data: res, ts: Date.now() };
+      }
+      if (isWrite) self.invalidateCache();
+      return res;
     });
+
+    if (isRead) this.state.pending[key] = promise;
+    return promise;
   },
+
+  invalidateCache: function () { this.state.cache = {}; this.state.pending = {}; },
 
   setContent: function (html) { document.getElementById('content').innerHTML = html; },
   setFilters: function (html) { document.getElementById('filters').innerHTML = html; },
+
+  /** Prev/Next + "Showing X-Y of Z" footer for a paginated api_get* response ({records,total,page,pageSize,totalPages}). */
+  paginationControls: function (pageInfo, onPageChange) {
+    var id = 'pg_' + Math.random().toString(36).slice(2, 8);
+    var from = pageInfo.total === 0 ? 0 : (pageInfo.page - 1) * pageInfo.pageSize + 1;
+    var to = Math.min(pageInfo.page * pageInfo.pageSize, pageInfo.total);
+    setTimeout(function () {
+      var prevBtn = document.getElementById(id + '_prev');
+      var nextBtn = document.getElementById(id + '_next');
+      if (prevBtn) prevBtn.onclick = function () { onPageChange(pageInfo.page - 1); };
+      if (nextBtn) nextBtn.onclick = function () { onPageChange(pageInfo.page + 1); };
+    }, 0);
+    return '<div class="toolbar" style="margin-top:10px">' +
+      '<span style="font-size:12px;color:var(--text-muted)">Showing ' + from + '-' + to + ' of ' + pageInfo.total + '</span>' +
+      '<span>' +
+      '<button class="btn secondary small" id="' + id + '_prev" ' + (pageInfo.page <= 1 ? 'disabled' : '') + '>← Prev</button> ' +
+      '<button class="btn secondary small" id="' + id + '_next" ' + (pageInfo.page >= pageInfo.totalPages ? 'disabled' : '') + '>Next →</button>' +
+      '</span></div>';
+  },
 
   showError: function (msg) {
     this.setContent('<div class="card"><div class="empty-state">⚠ ' + this.esc(msg) + '</div></div>');
@@ -233,7 +317,8 @@ var App = {
 /** All top-level views. Each function fetches data via App.call() then paints App.setContent(). */
 
 App.Views.dashboard = function () {
-  App.call('api_getDashboard').then(function (res) {
+  App.call('api_getDashboardBootstrap').then(function (res) {
+    App.mark('dashboardDataReceived');
     if (!res.ok) return App.showError(res.error);
     var d = res.data;
     var h = d.headline;
@@ -273,26 +358,33 @@ App.Views.dashboard = function () {
         '<div class="card"><h3>Budget vs Actual Spend by Month</h3><div style="height:260px"><canvas id="chartBudget"></canvas></div></div>' +
       '</div>'
     );
+    App.mark('kpiCardsRendered'); // KPI cards + alerts are now on screen — charts render next, deliberately deferred below
 
-    var c = d.charts;
-    App.barLineChart('chartRevMonth', c.revenueByMonth.map(function (m) { return m.month.slice(0, 3); }), [
-      { label: 'Target', data: c.revenueByMonth.map(function (m) { return m.revenueTarget; }), backgroundColor: '#cfd8e8' },
-      { label: 'Actual', data: c.revenueByMonth.map(function (m) { return m.revenueActual; }), backgroundColor: '#1a2b4c' }
-    ]);
-    App.barLineChart('chartBookMonth', c.revenueByMonth.map(function (m) { return m.month.slice(0, 3); }), [
-      { label: 'Target', data: c.revenueByMonth.map(function (m) { return m.bookingsTarget; }), backgroundColor: '#eadfc0' },
-      { label: 'Actual', data: c.revenueByMonth.map(function (m) { return m.bookingsActual; }), backgroundColor: '#c9a24b' }
-    ]);
-    App.barLineChart('chartRevMarket', c.revenueByMarket.map(function (m) { return m.market; }), [
-      { label: 'Target', data: c.revenueByMarket.map(function (m) { return m.target; }), backgroundColor: '#cfd8e8' },
-      { label: 'Actual', data: c.revenueByMarket.map(function (m) { return m.actual; }), backgroundColor: '#1a7f4e' }
-    ]);
-    App.pieChart('chartRevBU', c.revenueByBusinessUnit.map(function (m) { return m.businessUnit; }), c.revenueByBusinessUnit.map(function (m) { return m.actual; }));
-    App.pieChart('chartPipeStage', c.pipelineByStage.map(function (m) { return m.stage; }), c.pipelineByStage.map(function (m) { return m.value; }));
-    App.barLineChart('chartBudget', c.revenueByMonth.map(function (m) { return m.month.slice(0, 3); }), [
-      { label: 'Budget', data: c.revenueByMonth.map(function (m) { return m.budget; }), backgroundColor: '#eadfc0' },
-      { label: 'Actual Spend', data: c.revenueByMonth.map(function (m) { return m.actualSpend; }), backgroundColor: '#b3261e' }
-    ]);
+    // Progressive rendering (Section 9): yield to the browser with setTimeout(0) so the KPI
+    // cards/alerts above actually paint before Chart.js does its (heavier) canvas work,
+    // instead of both happening back-to-back in the same tick.
+    setTimeout(function () {
+      var c = d.charts;
+      App.barLineChart('chartRevMonth', c.revenueByMonth.map(function (m) { return m.month.slice(0, 3); }), [
+        { label: 'Target', data: c.revenueByMonth.map(function (m) { return m.revenueTarget; }), backgroundColor: '#cfd8e8' },
+        { label: 'Actual', data: c.revenueByMonth.map(function (m) { return m.revenueActual; }), backgroundColor: '#1a2b4c' }
+      ]);
+      App.barLineChart('chartBookMonth', c.revenueByMonth.map(function (m) { return m.month.slice(0, 3); }), [
+        { label: 'Target', data: c.revenueByMonth.map(function (m) { return m.bookingsTarget; }), backgroundColor: '#eadfc0' },
+        { label: 'Actual', data: c.revenueByMonth.map(function (m) { return m.bookingsActual; }), backgroundColor: '#c9a24b' }
+      ]);
+      App.barLineChart('chartRevMarket', c.revenueByMarket.map(function (m) { return m.market; }), [
+        { label: 'Target', data: c.revenueByMarket.map(function (m) { return m.target; }), backgroundColor: '#cfd8e8' },
+        { label: 'Actual', data: c.revenueByMarket.map(function (m) { return m.actual; }), backgroundColor: '#1a7f4e' }
+      ]);
+      App.pieChart('chartRevBU', c.revenueByBusinessUnit.map(function (m) { return m.businessUnit; }), c.revenueByBusinessUnit.map(function (m) { return m.actual; }));
+      App.pieChart('chartPipeStage', c.pipelineByStage.map(function (m) { return m.stage; }), c.pipelineByStage.map(function (m) { return m.value; }));
+      App.barLineChart('chartBudget', c.revenueByMonth.map(function (m) { return m.month.slice(0, 3); }), [
+        { label: 'Budget', data: c.revenueByMonth.map(function (m) { return m.budget; }), backgroundColor: '#eadfc0' },
+        { label: 'Actual Spend', data: c.revenueByMonth.map(function (m) { return m.actualSpend; }), backgroundColor: '#b3261e' }
+      ]);
+      App.mark('dashboardComplete');
+    }, 0);
   });
 };
 
@@ -352,7 +444,7 @@ function infoBlock(label, value) {
 
 // ---------------------------------------------------------------- Tasks
 App.Views.tasks = function () {
-  var filters = {};
+  var filters = { page: 1, pageSize: 50 };
   App.setFilters(
     '<select id="fltStatus"><option value="">All Status</option></select>' +
     '<select id="fltPriority"><option value="">All Priority</option></select>' +
@@ -363,9 +455,9 @@ App.Views.tasks = function () {
   fillOptions('fltPriority', App.state.lookups.taskPriority);
   document.getElementById('btnAddTask').onclick = function () { App.Forms.openTaskForm(null, null); };
   ['fltStatus', 'fltPriority'].forEach(function (id) {
-    document.getElementById(id).onchange = function () { load(); };
+    document.getElementById(id).onchange = function () { filters.page = 1; load(); };
   });
-  document.getElementById('fltSearch').oninput = debounce(function () { load(); }, 300);
+  document.getElementById('fltSearch').oninput = debounce(function () { filters.page = 1; load(); }, 300);
 
   function load() {
     filters.status = document.getElementById('fltStatus').value;
@@ -373,7 +465,8 @@ App.Views.tasks = function () {
     filters._search = document.getElementById('fltSearch').value;
     App.call('api_getTasks', filters).then(function (res) {
       if (!res.ok) return App.showError(res.error);
-      App.setContent('<div class="card">' + taskTable(res.data) + '</div>');
+      var page = res.data; // { records, total, page, pageSize, totalPages } — server-side pagination (Performance Sprint)
+      App.setContent('<div class="card">' + taskTable(page.records) + App.paginationControls(page, function (p) { filters.page = p; load(); }) + '</div>');
       wireTaskRowActions();
     });
   }
@@ -415,17 +508,19 @@ function wireTaskRowActions() {
 
 // ---------------------------------------------------------------- Sales CRM (Pipeline)
 App.Views.crm = function () {
+  var pageState = { page: 1, pageSize: 50 };
   App.setFilters('<select id="fltStage"><option value="">All Stages</option></select><input class="search" id="fltSearch" placeholder="Search opportunities…"><button class="btn small" id="btnAddOpp">+ Add Opportunity</button>');
   fillOptions('fltStage', App.state.lookups.salesStages.map(function (s) { return s.name; }));
   document.getElementById('btnAddOpp').onclick = function () { App.Forms.openPipelineForm(null); };
-  document.getElementById('fltStage').onchange = load;
-  document.getElementById('fltSearch').oninput = debounce(load, 300);
+  document.getElementById('fltStage').onchange = function () { pageState.page = 1; load(); };
+  document.getElementById('fltSearch').oninput = debounce(function () { pageState.page = 1; load(); }, 300);
 
   function load() {
-    var filters = { stage: document.getElementById('fltStage').value, _search: document.getElementById('fltSearch').value };
+    var filters = { stage: document.getElementById('fltStage').value, _search: document.getElementById('fltSearch').value, page: pageState.page, pageSize: pageState.pageSize };
     Promise.all([App.call('api_getPipeline', filters), App.call('api_getPipelineSummary')]).then(function (results) {
       var oppRes = results[0], sumRes = results[1];
       if (!oppRes.ok) return App.showError(oppRes.error);
+      var page = oppRes.data; // { records, total, page, pageSize, totalPages }
       var s = sumRes.ok ? sumRes.data : {};
       App.setContent(
         '<div class="kpi-grid">' +
@@ -444,12 +539,13 @@ App.Views.crm = function () {
           { key: 'weightedValue', label: 'Weighted', render: function (r) { return App.fmtMoney(r.weightedValue); } },
           { key: 'nextAction', label: 'Next Action' },
           { key: 'nextActionDate', label: 'Next Action Date', render: function (r) { return App.fmtDate(r.nextActionDate); } }
-        ], oppRes.data, { actions: function (r) { return '<a data-edit-opp="' + r.opportunityId + '">Edit</a><a data-del-opp="' + r.opportunityId + '">Delete</a>'; } }) + '</div>'
+        ], page.records, { actions: function (r) { return '<a data-edit-opp="' + r.opportunityId + '">Edit</a><a data-del-opp="' + r.opportunityId + '">Delete</a>'; } }) +
+        App.paginationControls(page, function (p) { pageState.page = p; load(); }) + '</div>'
       );
       document.querySelectorAll('[data-edit-opp]').forEach(function (el) {
         el.onclick = function () {
           var id = el.getAttribute('data-edit-opp');
-          var rec = oppRes.data.filter(function (o) { return o.opportunityId === id; })[0];
+          var rec = page.records.filter(function (o) { return o.opportunityId === id; })[0];
           App.Forms.openPipelineForm(rec);
         };
       });
@@ -463,85 +559,101 @@ App.Views.crm = function () {
 
 // ---------------------------------------------------------------- Revenue
 App.Views.revenue = function () {
+  var pageState = { page: 1, pageSize: 50 };
   App.setFilters('<button class="btn small" id="btnAddRev">+ Add Revenue Record</button>');
   document.getElementById('btnAddRev').onclick = function () { App.Forms.openRevenueForm(null); };
-  Promise.all([App.call('api_getRevenue'), App.call('api_getRevenueSummary')]).then(function (results) {
-    var revRes = results[0], sumRes = results[1];
-    if (!revRes.ok) return App.showError(revRes.error);
-    var s = sumRes.ok ? sumRes.data : {};
-    App.setContent(
-      '<div class="kpi-grid">' +
-        kpiTile('Sales Bookings', App.fmtMoney(s.bookings), 'Target ' + App.fmtMoney(s.bookingsTarget)) +
-        kpiTile('Invoiced', App.fmtMoney(s.invoiced), '') +
-        kpiTile('Recognized Revenue', App.fmtMoney(s.recognized), 'Target ' + App.fmtMoney(s.revenueTarget)) +
-        kpiTile('Cash Collected', App.fmtMoney(s.collected), App.fmtPct(s.collectionPct) + ' of invoiced') +
-        kpiTile('Outstanding Receivables', App.fmtMoney(s.outstanding), '') +
-        kpiTile('DSO', s.dso !== null ? s.dso + ' days' : 'N/A', '') +
-      '</div>' +
-      '<div class="card">' + App.table([
-        { key: 'client', label: 'Client' }, { key: 'project', label: 'Project' }, { key: 'market', label: 'Market' },
-        { key: 'businessUnit', label: 'Business Unit' }, { key: 'bdOwner', label: 'BD Owner' },
-        { key: 'contractValue', label: 'Contract Value', render: function (r) { return App.fmtMoney(r.contractValue); } },
-        { key: 'invoiceAmount', label: 'Invoiced', render: function (r) { return App.fmtMoney(r.invoiceAmount); } },
-        { key: 'amountCollected', label: 'Collected', render: function (r) { return App.fmtMoney(r.amountCollected); } },
-        { key: 'outstanding', label: 'Outstanding', render: function (r) { return App.fmtMoney(r.outstanding); } },
-        { key: 'collectionStatus', label: 'Collection', render: function (r) { return App.badge(r.collectionStatus, App.statusTone(r.collectionStatus)); } },
-        { key: 'daysOutstanding', label: 'Days O/S' }
-      ], revRes.data, { actions: function (r) { return '<a data-edit-rev="' + r.revenueId + '">Edit</a><a data-del-rev="' + r.revenueId + '">Delete</a>'; } }) + '</div>'
-    );
-    document.querySelectorAll('[data-edit-rev]').forEach(function (el) {
-      el.onclick = function () {
-        var rec = revRes.data.filter(function (r) { return r.revenueId === el.getAttribute('data-edit-rev'); })[0];
-        App.Forms.openRevenueForm(rec);
-      };
+  load();
+
+  function load() {
+    Promise.all([App.call('api_getRevenue', { page: pageState.page, pageSize: pageState.pageSize }), App.call('api_getRevenueSummary')]).then(function (results) {
+      var revRes = results[0], sumRes = results[1];
+      if (!revRes.ok) return App.showError(revRes.error);
+      var page = revRes.data; // { records, total, page, pageSize, totalPages }
+      var s = sumRes.ok ? sumRes.data : {};
+      App.setContent(
+        '<div class="kpi-grid">' +
+          kpiTile('Sales Bookings', App.fmtMoney(s.bookings), 'Target ' + App.fmtMoney(s.bookingsTarget)) +
+          kpiTile('Invoiced', App.fmtMoney(s.invoiced), '') +
+          kpiTile('Recognized Revenue', App.fmtMoney(s.recognized), 'Target ' + App.fmtMoney(s.revenueTarget)) +
+          kpiTile('Cash Collected', App.fmtMoney(s.collected), App.fmtPct(s.collectionPct) + ' of invoiced') +
+          kpiTile('Outstanding Receivables', App.fmtMoney(s.outstanding), '') +
+          kpiTile('DSO', s.dso !== null ? s.dso + ' days' : 'N/A', '') +
+        '</div>' +
+        '<div class="card">' + App.table([
+          { key: 'client', label: 'Client' }, { key: 'project', label: 'Project' }, { key: 'market', label: 'Market' },
+          { key: 'businessUnit', label: 'Business Unit' }, { key: 'bdOwner', label: 'BD Owner' },
+          { key: 'contractValue', label: 'Contract Value', render: function (r) { return App.fmtMoney(r.contractValue); } },
+          { key: 'invoiceAmount', label: 'Invoiced', render: function (r) { return App.fmtMoney(r.invoiceAmount); } },
+          { key: 'amountCollected', label: 'Collected', render: function (r) { return App.fmtMoney(r.amountCollected); } },
+          { key: 'outstanding', label: 'Outstanding', render: function (r) { return App.fmtMoney(r.outstanding); } },
+          { key: 'collectionStatus', label: 'Collection', render: function (r) { return App.badge(r.collectionStatus, App.statusTone(r.collectionStatus)); } },
+          { key: 'daysOutstanding', label: 'Days O/S' }
+        ], page.records, { actions: function (r) { return '<a data-edit-rev="' + r.revenueId + '">Edit</a><a data-del-rev="' + r.revenueId + '">Delete</a>'; } }) +
+        App.paginationControls(page, function (p) { pageState.page = p; load(); }) + '</div>'
+      );
+      document.querySelectorAll('[data-edit-rev]').forEach(function (el) {
+        el.onclick = function () {
+          var rec = page.records.filter(function (r) { return r.revenueId === el.getAttribute('data-edit-rev'); })[0];
+          App.Forms.openRevenueForm(rec);
+        };
+      });
+      document.querySelectorAll('[data-del-rev]').forEach(function (el) {
+        el.onclick = function () { if (confirm('Delete revenue record?')) App.call('api_deleteRevenue', el.getAttribute('data-del-rev')).then(function () { App.navigate('revenue'); }); };
+      });
     });
-    document.querySelectorAll('[data-del-rev]').forEach(function (el) {
-      el.onclick = function () { if (confirm('Delete revenue record?')) App.call('api_deleteRevenue', el.getAttribute('data-del-rev')).then(function () { App.navigate('revenue'); }); };
-    });
-  });
+  }
 };
 
 // ---------------------------------------------------------------- Expenses
 App.Views.expenses = function () {
+  var pageState = { page: 1, pageSize: 50 };
   App.setFilters('<button class="btn small" id="btnAddExp">+ Add Expense</button>');
   document.getElementById('btnAddExp').onclick = function () { App.Forms.openExpenseForm(null); };
-  Promise.all([App.call('api_getExpenses'), App.call('api_getExpenseSummary')]).then(function (results) {
-    var expRes = results[0], sumRes = results[1];
-    if (!expRes.ok) return App.showError(expRes.error);
-    var s = sumRes.ok ? sumRes.data : {};
-    App.setContent(
-      '<div class="kpi-grid">' +
-        kpiTile('Annual Budget', App.fmtMoney(s.annualBudget), '') +
-        kpiTile('Budgeted (logged)', App.fmtMoney(s.budgeted), '') +
-        kpiTile('Actual Spend', App.fmtMoney(s.actual), App.fmtPct(s.utilizationPct) + ' utilization') +
-        kpiTile('Variance', App.fmtMoney(s.variance), '') +
-      '</div>' +
-      '<div class="grid-2">' +
-        '<div class="card"><h3>Spend by Category</h3><div style="height:240px"><canvas id="chartExpCat"></canvas></div></div>' +
-        '<div class="card"><h3>Spend by Market</h3><div style="height:240px"><canvas id="chartExpMarket"></canvas></div></div>' +
-      '</div>' +
-      '<div class="card">' + App.table([
-        { key: 'date', label: 'Date', render: function (r) { return App.fmtDate(r.date); } },
-        { key: 'market', label: 'Market' }, { key: 'expenseCategory', label: 'Category' },
-        { key: 'expenseDescription', label: 'Description' }, { key: 'vendor', label: 'Vendor' },
-        { key: 'budgetedAmount', label: 'Budgeted', render: function (r) { return App.fmtMoney(r.budgetedAmount); } },
-        { key: 'actualAmount', label: 'Actual', render: function (r) { return App.fmtMoney(r.actualAmount); } },
-        { key: 'variance', label: 'Variance', render: function (r) { return App.fmtMoney(r.variance); } },
-        { key: 'paymentStatus', label: 'Payment', render: function (r) { return App.badge(r.paymentStatus, App.statusTone(r.paymentStatus)); } }
-      ], expRes.data, { actions: function (r) { return '<a data-edit-exp="' + r.expenseId + '">Edit</a><a data-del-exp="' + r.expenseId + '">Delete</a>'; } }) + '</div>'
-    );
-    App.pieChart('chartExpCat', Object.keys(s.byCategory || {}), Object.values(s.byCategory || {}));
-    App.pieChart('chartExpMarket', Object.keys(s.byMarket || {}), Object.values(s.byMarket || {}));
-    document.querySelectorAll('[data-edit-exp]').forEach(function (el) {
-      el.onclick = function () {
-        var rec = expRes.data.filter(function (r) { return r.expenseId === el.getAttribute('data-edit-exp'); })[0];
-        App.Forms.openExpenseForm(rec);
-      };
+  load();
+
+  function load() {
+    Promise.all([App.call('api_getExpenses', { page: pageState.page, pageSize: pageState.pageSize }), App.call('api_getExpenseSummary')]).then(function (results) {
+      var expRes = results[0], sumRes = results[1];
+      if (!expRes.ok) return App.showError(expRes.error);
+      var page = expRes.data; // { records, total, page, pageSize, totalPages }
+      var s = sumRes.ok ? sumRes.data : {};
+      App.setContent(
+        '<div class="kpi-grid">' +
+          kpiTile('Annual Budget', App.fmtMoney(s.annualBudget), '') +
+          kpiTile('Budgeted (logged)', App.fmtMoney(s.budgeted), '') +
+          kpiTile('Actual Spend', App.fmtMoney(s.actual), App.fmtPct(s.utilizationPct) + ' utilization') +
+          kpiTile('Variance', App.fmtMoney(s.variance), '') +
+        '</div>' +
+        '<div class="grid-2">' +
+          '<div class="card"><h3>Spend by Category</h3><div style="height:240px"><canvas id="chartExpCat"></canvas></div></div>' +
+          '<div class="card"><h3>Spend by Market</h3><div style="height:240px"><canvas id="chartExpMarket"></canvas></div></div>' +
+        '</div>' +
+        '<div class="card">' + App.table([
+          { key: 'date', label: 'Date', render: function (r) { return App.fmtDate(r.date); } },
+          { key: 'market', label: 'Market' }, { key: 'expenseCategory', label: 'Category' },
+          { key: 'expenseDescription', label: 'Description' }, { key: 'vendor', label: 'Vendor' },
+          { key: 'budgetedAmount', label: 'Budgeted', render: function (r) { return App.fmtMoney(r.budgetedAmount); } },
+          { key: 'actualAmount', label: 'Actual', render: function (r) { return App.fmtMoney(r.actualAmount); } },
+          { key: 'variance', label: 'Variance', render: function (r) { return App.fmtMoney(r.variance); } },
+          { key: 'paymentStatus', label: 'Payment', render: function (r) { return App.badge(r.paymentStatus, App.statusTone(r.paymentStatus)); } }
+        ], page.records, { actions: function (r) { return '<a data-edit-exp="' + r.expenseId + '">Edit</a><a data-del-exp="' + r.expenseId + '">Delete</a>'; } }) +
+        App.paginationControls(page, function (p) { pageState.page = p; load(); }) + '</div>'
+      );
+      setTimeout(function () {
+        App.pieChart('chartExpCat', Object.keys(s.byCategory || {}), Object.values(s.byCategory || {}));
+        App.pieChart('chartExpMarket', Object.keys(s.byMarket || {}), Object.values(s.byMarket || {}));
+      }, 0);
+      document.querySelectorAll('[data-edit-exp]').forEach(function (el) {
+        el.onclick = function () {
+          var rec = page.records.filter(function (r) { return r.expenseId === el.getAttribute('data-edit-exp'); })[0];
+          App.Forms.openExpenseForm(rec);
+        };
+      });
+      document.querySelectorAll('[data-del-exp]').forEach(function (el) {
+        el.onclick = function () { if (confirm('Delete expense?')) App.call('api_deleteExpense', el.getAttribute('data-del-exp')).then(function () { App.navigate('expenses'); }); };
+      });
     });
-    document.querySelectorAll('[data-del-exp]').forEach(function (el) {
-      el.onclick = function () { if (confirm('Delete expense?')) App.call('api_deleteExpense', el.getAttribute('data-del-exp')).then(function () { App.navigate('expenses'); }); };
-    });
-  });
+  }
 };
 
 // ---------------------------------------------------------------- Markets (heatmap)

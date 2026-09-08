@@ -5,7 +5,18 @@
  * Both attach to the same global `App` object defined here.
  */
 var App = {
-  state: { lookups: null, charts: {}, currentView: 'dashboard' },
+  state: { lookups: null, charts: {}, currentView: 'dashboard', cache: {}, pending: {} },
+  CACHE_TTL_MS: 60000, // Performance Sprint: a view fetched again within this window is served from memory, not the server
+
+  // ---- Performance instrumentation: performance.now() markers, logged to the console.
+  // Not surfaced in the UI — open devtools to see them. Safe to leave in permanently. ----
+  perf: { marks: {} },
+  mark: function (name) {
+    var t = (window.performance && performance.now) ? performance.now() : Date.now();
+    this.perf.marks[name] = t;
+    console.log('[perf] ' + name + ': ' + t.toFixed(0) + 'ms since navigation start');
+    return t;
+  },
 
   NAV: [
     { id: 'dashboard', label: 'Dashboard', icon: '◆' },
@@ -27,10 +38,14 @@ var App = {
   ],
 
   init: function () {
+    if (this._initStarted) return; // guard against a stray duplicate init call re-fetching everything
+    this._initStarted = true;
+    this.mark('shellDisplayed'); // sidebar/topbar/CSS are already painted by the time this JS runs — see Index.html
     this.renderNav();
     var self = this;
     this.call('api_getLookups').then(function (res) {
       self.state.lookups = res.ok ? res.data : {};
+      self.mark('lookupsReceived');
       self.navigate('dashboard');
     });
   },
@@ -46,6 +61,19 @@ var App = {
     });
   },
 
+  // Skeleton placeholders shown the instant a nav item is clicked, before any server response
+  // arrives — keeps the interface feeling responsive even on a slow connection (Section 9,
+  // "progressive visual loading": Phase 1 shell is already on screen, this is Phase 2's
+  // placeholder ahead of the real KPI cards/table landing in the same slot).
+  SKELETON: '<div class="kpi-grid">' +
+    '<div class="kpi-card"><div class="label">&nbsp;</div><div class="value">···</div></div>'.repeat(4) +
+    '</div><div class="card"><div class="loading">Loading…</div></div>',
+
+  // Re-navigating to the same view (e.g. after a CRUD save calls App.navigate(currentView)
+  // to refresh it) is intentionally NOT short-circuited here — the render function itself is
+  // cheap, and the actual expensive part (the server round trip inside App.call) is already
+  // deduped/cached there, with writes clearing that cache so a post-save refresh always
+  // fetches the new data instead of quietly reusing something stale.
   navigate: function (viewId) {
     this.state.currentView = viewId;
     document.querySelectorAll('#nav-list .item').forEach(function (i) {
@@ -54,15 +82,40 @@ var App = {
     var nav = this.NAV.filter(function (n) { return n.id === viewId; })[0];
     document.getElementById('page-title').textContent = nav ? nav.label : '';
     document.getElementById('filters').innerHTML = '';
-    document.getElementById('content').innerHTML = '<div class="loading">Loading…</div>';
+    document.getElementById('content').innerHTML = this.SKELETON;
     var renderer = this.Views[viewId];
     if (renderer) renderer(); else this.setContent('<div class="empty-state">View not found.</div>');
   },
 
-  // ---- Server call wrapper: promisifies google.script.run and unwraps the {ok,data} envelope. ----
+  /**
+   * Server call wrapper: promisifies google.script.run, unwraps the {ok,data} envelope, and
+   * (Performance Sprint) adds a short in-memory cache + in-flight de-duplication for read
+   * calls (functions named "api_get..."): navigating back to a view already loaded within
+   * CACHE_TTL_MS resolves instantly with no network round trip, and two callers asking for
+   * the exact same data at the same moment (e.g. a double click) share one request instead
+   * of firing two. Any write call (a function named "api_save..." or "api_delete...") clears
+   * the whole cache afterward — simplest correct invalidation policy: a write can affect more
+   * than one view's aggregates (e.g. a task edit changes both the Tasks table and the
+   * Dashboard's completion %), so rather than hand-maintain which cache entries a given write
+   * can touch, just drop all of them and let
+   * the next visit to each view re-fetch once.
+   */
   call: function (fnName) {
     var args = Array.prototype.slice.call(arguments, 1);
-    return new Promise(function (resolve) {
+    var isRead = fnName.indexOf('api_get') === 0;
+    var isWrite = fnName.indexOf('api_save') === 0 || fnName.indexOf('api_delete') === 0;
+    var key = fnName + '|' + JSON.stringify(args);
+    var self = this;
+
+    if (isRead) {
+      var cached = this.state.cache[key];
+      if (cached && (Date.now() - cached.ts) < this.CACHE_TTL_MS) {
+        return Promise.resolve(cached.data);
+      }
+      if (this.state.pending[key]) return this.state.pending[key];
+    }
+
+    var promise = new Promise(function (resolve) {
       if (typeof google === 'undefined' || !google.script) {
         resolve({ ok: false, error: 'Not running inside Apps Script (google.script.run unavailable).' });
         return;
@@ -71,11 +124,42 @@ var App = {
         .withSuccessHandler(function (res) { resolve(res); })
         .withFailureHandler(function (err) { resolve({ ok: false, error: String(err) }); });
       runner[fnName].apply(runner, args);
+    }).then(function (res) {
+      if (isRead) {
+        delete self.state.pending[key];
+        if (res && res.ok) self.state.cache[key] = { data: res, ts: Date.now() };
+      }
+      if (isWrite) self.invalidateCache();
+      return res;
     });
+
+    if (isRead) this.state.pending[key] = promise;
+    return promise;
   },
+
+  invalidateCache: function () { this.state.cache = {}; this.state.pending = {}; },
 
   setContent: function (html) { document.getElementById('content').innerHTML = html; },
   setFilters: function (html) { document.getElementById('filters').innerHTML = html; },
+
+  /** Prev/Next + "Showing X-Y of Z" footer for a paginated api_get* response ({records,total,page,pageSize,totalPages}). */
+  paginationControls: function (pageInfo, onPageChange) {
+    var id = 'pg_' + Math.random().toString(36).slice(2, 8);
+    var from = pageInfo.total === 0 ? 0 : (pageInfo.page - 1) * pageInfo.pageSize + 1;
+    var to = Math.min(pageInfo.page * pageInfo.pageSize, pageInfo.total);
+    setTimeout(function () {
+      var prevBtn = document.getElementById(id + '_prev');
+      var nextBtn = document.getElementById(id + '_next');
+      if (prevBtn) prevBtn.onclick = function () { onPageChange(pageInfo.page - 1); };
+      if (nextBtn) nextBtn.onclick = function () { onPageChange(pageInfo.page + 1); };
+    }, 0);
+    return '<div class="toolbar" style="margin-top:10px">' +
+      '<span style="font-size:12px;color:var(--text-muted)">Showing ' + from + '-' + to + ' of ' + pageInfo.total + '</span>' +
+      '<span>' +
+      '<button class="btn secondary small" id="' + id + '_prev" ' + (pageInfo.page <= 1 ? 'disabled' : '') + '>← Prev</button> ' +
+      '<button class="btn secondary small" id="' + id + '_next" ' + (pageInfo.page >= pageInfo.totalPages ? 'disabled' : '') + '>Next →</button>' +
+      '</span></div>';
+  },
 
   showError: function (msg) {
     this.setContent('<div class="card"><div class="empty-state">⚠ ' + this.esc(msg) + '</div></div>');

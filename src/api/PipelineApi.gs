@@ -1,6 +1,8 @@
+/** Pass filters.page to get { records, total, page, pageSize, totalPages } instead of a plain array — see paginate_(). */
 function api_getPipeline(filters) {
   return safeCall_(function () {
-    return applyFilters_(readAllRecords(SHEETS.PIPELINE).map(stripRowMeta_), filters);
+    var all = applyFilters_(readAllRecords(SHEETS.PIPELINE).map(stripRowMeta_), filters);
+    return (filters && filters.page) ? paginate_(all, filters) : all;
   });
 }
 
@@ -13,12 +15,17 @@ function api_savePipeline(rec) {
       appendRecord(SHEETS.PIPELINE, rec);
     }
     recomputePipeline_();
+    invalidateDashboardCache_();
     return rec.opportunityId || true;
   });
 }
 
 function api_deletePipeline(id) {
-  return safeCall_(function () { return deleteRecordById(SHEETS.PIPELINE, id); });
+  return safeCall_(function () {
+    var result = deleteRecordById(SHEETS.PIPELINE, id);
+    invalidateDashboardCache_();
+    return result;
+  });
 }
 
 /** Section 11: pipeline value, weighted pipeline, win rate, cycle, average deal, coverage, breakdowns. */

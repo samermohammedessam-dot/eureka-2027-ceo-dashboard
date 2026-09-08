@@ -1,6 +1,8 @@
+/** Pass filters.page to get { records, total, page, pageSize, totalPages } instead of a plain array — see paginate_(). */
 function api_getExpenses(filters) {
   return safeCall_(function () {
-    return applyFilters_(readAllRecords(SHEETS.EXPENSES).map(stripRowMeta_), filters);
+    var all = applyFilters_(readAllRecords(SHEETS.EXPENSES).map(stripRowMeta_), filters);
+    return (filters && filters.page) ? paginate_(all, filters) : all;
   });
 }
 
@@ -12,12 +14,17 @@ function api_saveExpense(rec) {
       appendRecord(SHEETS.EXPENSES, rec);
     }
     recomputeExpenses_();
+    invalidateDashboardCache_();
     return rec.expenseId || true;
   });
 }
 
 function api_deleteExpense(id) {
-  return safeCall_(function () { return deleteRecordById(SHEETS.EXPENSES, id); });
+  return safeCall_(function () {
+    var result = deleteRecordById(SHEETS.EXPENSES, id);
+    invalidateDashboardCache_();
+    return result;
+  });
 }
 
 function api_getExpenseSummary() {

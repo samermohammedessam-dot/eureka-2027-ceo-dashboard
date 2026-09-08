@@ -2,7 +2,8 @@
 /** All top-level views. Each function fetches data via App.call() then paints App.setContent(). */
 
 App.Views.dashboard = function () {
-  App.call('api_getDashboard').then(function (res) {
+  App.call('api_getDashboardBootstrap').then(function (res) {
+    App.mark('dashboardDataReceived');
     if (!res.ok) return App.showError(res.error);
     var d = res.data;
     var h = d.headline;
@@ -42,26 +43,33 @@ App.Views.dashboard = function () {
         '<div class="card"><h3>Budget vs Actual Spend by Month</h3><div style="height:260px"><canvas id="chartBudget"></canvas></div></div>' +
       '</div>'
     );
+    App.mark('kpiCardsRendered'); // KPI cards + alerts are now on screen — charts render next, deliberately deferred below
 
-    var c = d.charts;
-    App.barLineChart('chartRevMonth', c.revenueByMonth.map(function (m) { return m.month.slice(0, 3); }), [
-      { label: 'Target', data: c.revenueByMonth.map(function (m) { return m.revenueTarget; }), backgroundColor: '#cfd8e8' },
-      { label: 'Actual', data: c.revenueByMonth.map(function (m) { return m.revenueActual; }), backgroundColor: '#1a2b4c' }
-    ]);
-    App.barLineChart('chartBookMonth', c.revenueByMonth.map(function (m) { return m.month.slice(0, 3); }), [
-      { label: 'Target', data: c.revenueByMonth.map(function (m) { return m.bookingsTarget; }), backgroundColor: '#eadfc0' },
-      { label: 'Actual', data: c.revenueByMonth.map(function (m) { return m.bookingsActual; }), backgroundColor: '#c9a24b' }
-    ]);
-    App.barLineChart('chartRevMarket', c.revenueByMarket.map(function (m) { return m.market; }), [
-      { label: 'Target', data: c.revenueByMarket.map(function (m) { return m.target; }), backgroundColor: '#cfd8e8' },
-      { label: 'Actual', data: c.revenueByMarket.map(function (m) { return m.actual; }), backgroundColor: '#1a7f4e' }
-    ]);
-    App.pieChart('chartRevBU', c.revenueByBusinessUnit.map(function (m) { return m.businessUnit; }), c.revenueByBusinessUnit.map(function (m) { return m.actual; }));
-    App.pieChart('chartPipeStage', c.pipelineByStage.map(function (m) { return m.stage; }), c.pipelineByStage.map(function (m) { return m.value; }));
-    App.barLineChart('chartBudget', c.revenueByMonth.map(function (m) { return m.month.slice(0, 3); }), [
-      { label: 'Budget', data: c.revenueByMonth.map(function (m) { return m.budget; }), backgroundColor: '#eadfc0' },
-      { label: 'Actual Spend', data: c.revenueByMonth.map(function (m) { return m.actualSpend; }), backgroundColor: '#b3261e' }
-    ]);
+    // Progressive rendering (Section 9): yield to the browser with setTimeout(0) so the KPI
+    // cards/alerts above actually paint before Chart.js does its (heavier) canvas work,
+    // instead of both happening back-to-back in the same tick.
+    setTimeout(function () {
+      var c = d.charts;
+      App.barLineChart('chartRevMonth', c.revenueByMonth.map(function (m) { return m.month.slice(0, 3); }), [
+        { label: 'Target', data: c.revenueByMonth.map(function (m) { return m.revenueTarget; }), backgroundColor: '#cfd8e8' },
+        { label: 'Actual', data: c.revenueByMonth.map(function (m) { return m.revenueActual; }), backgroundColor: '#1a2b4c' }
+      ]);
+      App.barLineChart('chartBookMonth', c.revenueByMonth.map(function (m) { return m.month.slice(0, 3); }), [
+        { label: 'Target', data: c.revenueByMonth.map(function (m) { return m.bookingsTarget; }), backgroundColor: '#eadfc0' },
+        { label: 'Actual', data: c.revenueByMonth.map(function (m) { return m.bookingsActual; }), backgroundColor: '#c9a24b' }
+      ]);
+      App.barLineChart('chartRevMarket', c.revenueByMarket.map(function (m) { return m.market; }), [
+        { label: 'Target', data: c.revenueByMarket.map(function (m) { return m.target; }), backgroundColor: '#cfd8e8' },
+        { label: 'Actual', data: c.revenueByMarket.map(function (m) { return m.actual; }), backgroundColor: '#1a7f4e' }
+      ]);
+      App.pieChart('chartRevBU', c.revenueByBusinessUnit.map(function (m) { return m.businessUnit; }), c.revenueByBusinessUnit.map(function (m) { return m.actual; }));
+      App.pieChart('chartPipeStage', c.pipelineByStage.map(function (m) { return m.stage; }), c.pipelineByStage.map(function (m) { return m.value; }));
+      App.barLineChart('chartBudget', c.revenueByMonth.map(function (m) { return m.month.slice(0, 3); }), [
+        { label: 'Budget', data: c.revenueByMonth.map(function (m) { return m.budget; }), backgroundColor: '#eadfc0' },
+        { label: 'Actual Spend', data: c.revenueByMonth.map(function (m) { return m.actualSpend; }), backgroundColor: '#b3261e' }
+      ]);
+      App.mark('dashboardComplete');
+    }, 0);
   });
 };
 
@@ -121,7 +129,7 @@ function infoBlock(label, value) {
 
 // ---------------------------------------------------------------- Tasks
 App.Views.tasks = function () {
-  var filters = {};
+  var filters = { page: 1, pageSize: 50 };
   App.setFilters(
     '<select id="fltStatus"><option value="">All Status</option></select>' +
     '<select id="fltPriority"><option value="">All Priority</option></select>' +
@@ -132,9 +140,9 @@ App.Views.tasks = function () {
   fillOptions('fltPriority', App.state.lookups.taskPriority);
   document.getElementById('btnAddTask').onclick = function () { App.Forms.openTaskForm(null, null); };
   ['fltStatus', 'fltPriority'].forEach(function (id) {
-    document.getElementById(id).onchange = function () { load(); };
+    document.getElementById(id).onchange = function () { filters.page = 1; load(); };
   });
-  document.getElementById('fltSearch').oninput = debounce(function () { load(); }, 300);
+  document.getElementById('fltSearch').oninput = debounce(function () { filters.page = 1; load(); }, 300);
 
   function load() {
     filters.status = document.getElementById('fltStatus').value;
@@ -142,7 +150,8 @@ App.Views.tasks = function () {
     filters._search = document.getElementById('fltSearch').value;
     App.call('api_getTasks', filters).then(function (res) {
       if (!res.ok) return App.showError(res.error);
-      App.setContent('<div class="card">' + taskTable(res.data) + '</div>');
+      var page = res.data; // { records, total, page, pageSize, totalPages } — server-side pagination (Performance Sprint)
+      App.setContent('<div class="card">' + taskTable(page.records) + App.paginationControls(page, function (p) { filters.page = p; load(); }) + '</div>');
       wireTaskRowActions();
     });
   }
@@ -184,17 +193,19 @@ function wireTaskRowActions() {
 
 // ---------------------------------------------------------------- Sales CRM (Pipeline)
 App.Views.crm = function () {
+  var pageState = { page: 1, pageSize: 50 };
   App.setFilters('<select id="fltStage"><option value="">All Stages</option></select><input class="search" id="fltSearch" placeholder="Search opportunities…"><button class="btn small" id="btnAddOpp">+ Add Opportunity</button>');
   fillOptions('fltStage', App.state.lookups.salesStages.map(function (s) { return s.name; }));
   document.getElementById('btnAddOpp').onclick = function () { App.Forms.openPipelineForm(null); };
-  document.getElementById('fltStage').onchange = load;
-  document.getElementById('fltSearch').oninput = debounce(load, 300);
+  document.getElementById('fltStage').onchange = function () { pageState.page = 1; load(); };
+  document.getElementById('fltSearch').oninput = debounce(function () { pageState.page = 1; load(); }, 300);
 
   function load() {
-    var filters = { stage: document.getElementById('fltStage').value, _search: document.getElementById('fltSearch').value };
+    var filters = { stage: document.getElementById('fltStage').value, _search: document.getElementById('fltSearch').value, page: pageState.page, pageSize: pageState.pageSize };
     Promise.all([App.call('api_getPipeline', filters), App.call('api_getPipelineSummary')]).then(function (results) {
       var oppRes = results[0], sumRes = results[1];
       if (!oppRes.ok) return App.showError(oppRes.error);
+      var page = oppRes.data; // { records, total, page, pageSize, totalPages }
       var s = sumRes.ok ? sumRes.data : {};
       App.setContent(
         '<div class="kpi-grid">' +
@@ -213,12 +224,13 @@ App.Views.crm = function () {
           { key: 'weightedValue', label: 'Weighted', render: function (r) { return App.fmtMoney(r.weightedValue); } },
           { key: 'nextAction', label: 'Next Action' },
           { key: 'nextActionDate', label: 'Next Action Date', render: function (r) { return App.fmtDate(r.nextActionDate); } }
-        ], oppRes.data, { actions: function (r) { return '<a data-edit-opp="' + r.opportunityId + '">Edit</a><a data-del-opp="' + r.opportunityId + '">Delete</a>'; } }) + '</div>'
+        ], page.records, { actions: function (r) { return '<a data-edit-opp="' + r.opportunityId + '">Edit</a><a data-del-opp="' + r.opportunityId + '">Delete</a>'; } }) +
+        App.paginationControls(page, function (p) { pageState.page = p; load(); }) + '</div>'
       );
       document.querySelectorAll('[data-edit-opp]').forEach(function (el) {
         el.onclick = function () {
           var id = el.getAttribute('data-edit-opp');
-          var rec = oppRes.data.filter(function (o) { return o.opportunityId === id; })[0];
+          var rec = page.records.filter(function (o) { return o.opportunityId === id; })[0];
           App.Forms.openPipelineForm(rec);
         };
       });
@@ -232,85 +244,101 @@ App.Views.crm = function () {
 
 // ---------------------------------------------------------------- Revenue
 App.Views.revenue = function () {
+  var pageState = { page: 1, pageSize: 50 };
   App.setFilters('<button class="btn small" id="btnAddRev">+ Add Revenue Record</button>');
   document.getElementById('btnAddRev').onclick = function () { App.Forms.openRevenueForm(null); };
-  Promise.all([App.call('api_getRevenue'), App.call('api_getRevenueSummary')]).then(function (results) {
-    var revRes = results[0], sumRes = results[1];
-    if (!revRes.ok) return App.showError(revRes.error);
-    var s = sumRes.ok ? sumRes.data : {};
-    App.setContent(
-      '<div class="kpi-grid">' +
-        kpiTile('Sales Bookings', App.fmtMoney(s.bookings), 'Target ' + App.fmtMoney(s.bookingsTarget)) +
-        kpiTile('Invoiced', App.fmtMoney(s.invoiced), '') +
-        kpiTile('Recognized Revenue', App.fmtMoney(s.recognized), 'Target ' + App.fmtMoney(s.revenueTarget)) +
-        kpiTile('Cash Collected', App.fmtMoney(s.collected), App.fmtPct(s.collectionPct) + ' of invoiced') +
-        kpiTile('Outstanding Receivables', App.fmtMoney(s.outstanding), '') +
-        kpiTile('DSO', s.dso !== null ? s.dso + ' days' : 'N/A', '') +
-      '</div>' +
-      '<div class="card">' + App.table([
-        { key: 'client', label: 'Client' }, { key: 'project', label: 'Project' }, { key: 'market', label: 'Market' },
-        { key: 'businessUnit', label: 'Business Unit' }, { key: 'bdOwner', label: 'BD Owner' },
-        { key: 'contractValue', label: 'Contract Value', render: function (r) { return App.fmtMoney(r.contractValue); } },
-        { key: 'invoiceAmount', label: 'Invoiced', render: function (r) { return App.fmtMoney(r.invoiceAmount); } },
-        { key: 'amountCollected', label: 'Collected', render: function (r) { return App.fmtMoney(r.amountCollected); } },
-        { key: 'outstanding', label: 'Outstanding', render: function (r) { return App.fmtMoney(r.outstanding); } },
-        { key: 'collectionStatus', label: 'Collection', render: function (r) { return App.badge(r.collectionStatus, App.statusTone(r.collectionStatus)); } },
-        { key: 'daysOutstanding', label: 'Days O/S' }
-      ], revRes.data, { actions: function (r) { return '<a data-edit-rev="' + r.revenueId + '">Edit</a><a data-del-rev="' + r.revenueId + '">Delete</a>'; } }) + '</div>'
-    );
-    document.querySelectorAll('[data-edit-rev]').forEach(function (el) {
-      el.onclick = function () {
-        var rec = revRes.data.filter(function (r) { return r.revenueId === el.getAttribute('data-edit-rev'); })[0];
-        App.Forms.openRevenueForm(rec);
-      };
+  load();
+
+  function load() {
+    Promise.all([App.call('api_getRevenue', { page: pageState.page, pageSize: pageState.pageSize }), App.call('api_getRevenueSummary')]).then(function (results) {
+      var revRes = results[0], sumRes = results[1];
+      if (!revRes.ok) return App.showError(revRes.error);
+      var page = revRes.data; // { records, total, page, pageSize, totalPages }
+      var s = sumRes.ok ? sumRes.data : {};
+      App.setContent(
+        '<div class="kpi-grid">' +
+          kpiTile('Sales Bookings', App.fmtMoney(s.bookings), 'Target ' + App.fmtMoney(s.bookingsTarget)) +
+          kpiTile('Invoiced', App.fmtMoney(s.invoiced), '') +
+          kpiTile('Recognized Revenue', App.fmtMoney(s.recognized), 'Target ' + App.fmtMoney(s.revenueTarget)) +
+          kpiTile('Cash Collected', App.fmtMoney(s.collected), App.fmtPct(s.collectionPct) + ' of invoiced') +
+          kpiTile('Outstanding Receivables', App.fmtMoney(s.outstanding), '') +
+          kpiTile('DSO', s.dso !== null ? s.dso + ' days' : 'N/A', '') +
+        '</div>' +
+        '<div class="card">' + App.table([
+          { key: 'client', label: 'Client' }, { key: 'project', label: 'Project' }, { key: 'market', label: 'Market' },
+          { key: 'businessUnit', label: 'Business Unit' }, { key: 'bdOwner', label: 'BD Owner' },
+          { key: 'contractValue', label: 'Contract Value', render: function (r) { return App.fmtMoney(r.contractValue); } },
+          { key: 'invoiceAmount', label: 'Invoiced', render: function (r) { return App.fmtMoney(r.invoiceAmount); } },
+          { key: 'amountCollected', label: 'Collected', render: function (r) { return App.fmtMoney(r.amountCollected); } },
+          { key: 'outstanding', label: 'Outstanding', render: function (r) { return App.fmtMoney(r.outstanding); } },
+          { key: 'collectionStatus', label: 'Collection', render: function (r) { return App.badge(r.collectionStatus, App.statusTone(r.collectionStatus)); } },
+          { key: 'daysOutstanding', label: 'Days O/S' }
+        ], page.records, { actions: function (r) { return '<a data-edit-rev="' + r.revenueId + '">Edit</a><a data-del-rev="' + r.revenueId + '">Delete</a>'; } }) +
+        App.paginationControls(page, function (p) { pageState.page = p; load(); }) + '</div>'
+      );
+      document.querySelectorAll('[data-edit-rev]').forEach(function (el) {
+        el.onclick = function () {
+          var rec = page.records.filter(function (r) { return r.revenueId === el.getAttribute('data-edit-rev'); })[0];
+          App.Forms.openRevenueForm(rec);
+        };
+      });
+      document.querySelectorAll('[data-del-rev]').forEach(function (el) {
+        el.onclick = function () { if (confirm('Delete revenue record?')) App.call('api_deleteRevenue', el.getAttribute('data-del-rev')).then(function () { App.navigate('revenue'); }); };
+      });
     });
-    document.querySelectorAll('[data-del-rev]').forEach(function (el) {
-      el.onclick = function () { if (confirm('Delete revenue record?')) App.call('api_deleteRevenue', el.getAttribute('data-del-rev')).then(function () { App.navigate('revenue'); }); };
-    });
-  });
+  }
 };
 
 // ---------------------------------------------------------------- Expenses
 App.Views.expenses = function () {
+  var pageState = { page: 1, pageSize: 50 };
   App.setFilters('<button class="btn small" id="btnAddExp">+ Add Expense</button>');
   document.getElementById('btnAddExp').onclick = function () { App.Forms.openExpenseForm(null); };
-  Promise.all([App.call('api_getExpenses'), App.call('api_getExpenseSummary')]).then(function (results) {
-    var expRes = results[0], sumRes = results[1];
-    if (!expRes.ok) return App.showError(expRes.error);
-    var s = sumRes.ok ? sumRes.data : {};
-    App.setContent(
-      '<div class="kpi-grid">' +
-        kpiTile('Annual Budget', App.fmtMoney(s.annualBudget), '') +
-        kpiTile('Budgeted (logged)', App.fmtMoney(s.budgeted), '') +
-        kpiTile('Actual Spend', App.fmtMoney(s.actual), App.fmtPct(s.utilizationPct) + ' utilization') +
-        kpiTile('Variance', App.fmtMoney(s.variance), '') +
-      '</div>' +
-      '<div class="grid-2">' +
-        '<div class="card"><h3>Spend by Category</h3><div style="height:240px"><canvas id="chartExpCat"></canvas></div></div>' +
-        '<div class="card"><h3>Spend by Market</h3><div style="height:240px"><canvas id="chartExpMarket"></canvas></div></div>' +
-      '</div>' +
-      '<div class="card">' + App.table([
-        { key: 'date', label: 'Date', render: function (r) { return App.fmtDate(r.date); } },
-        { key: 'market', label: 'Market' }, { key: 'expenseCategory', label: 'Category' },
-        { key: 'expenseDescription', label: 'Description' }, { key: 'vendor', label: 'Vendor' },
-        { key: 'budgetedAmount', label: 'Budgeted', render: function (r) { return App.fmtMoney(r.budgetedAmount); } },
-        { key: 'actualAmount', label: 'Actual', render: function (r) { return App.fmtMoney(r.actualAmount); } },
-        { key: 'variance', label: 'Variance', render: function (r) { return App.fmtMoney(r.variance); } },
-        { key: 'paymentStatus', label: 'Payment', render: function (r) { return App.badge(r.paymentStatus, App.statusTone(r.paymentStatus)); } }
-      ], expRes.data, { actions: function (r) { return '<a data-edit-exp="' + r.expenseId + '">Edit</a><a data-del-exp="' + r.expenseId + '">Delete</a>'; } }) + '</div>'
-    );
-    App.pieChart('chartExpCat', Object.keys(s.byCategory || {}), Object.values(s.byCategory || {}));
-    App.pieChart('chartExpMarket', Object.keys(s.byMarket || {}), Object.values(s.byMarket || {}));
-    document.querySelectorAll('[data-edit-exp]').forEach(function (el) {
-      el.onclick = function () {
-        var rec = expRes.data.filter(function (r) { return r.expenseId === el.getAttribute('data-edit-exp'); })[0];
-        App.Forms.openExpenseForm(rec);
-      };
+  load();
+
+  function load() {
+    Promise.all([App.call('api_getExpenses', { page: pageState.page, pageSize: pageState.pageSize }), App.call('api_getExpenseSummary')]).then(function (results) {
+      var expRes = results[0], sumRes = results[1];
+      if (!expRes.ok) return App.showError(expRes.error);
+      var page = expRes.data; // { records, total, page, pageSize, totalPages }
+      var s = sumRes.ok ? sumRes.data : {};
+      App.setContent(
+        '<div class="kpi-grid">' +
+          kpiTile('Annual Budget', App.fmtMoney(s.annualBudget), '') +
+          kpiTile('Budgeted (logged)', App.fmtMoney(s.budgeted), '') +
+          kpiTile('Actual Spend', App.fmtMoney(s.actual), App.fmtPct(s.utilizationPct) + ' utilization') +
+          kpiTile('Variance', App.fmtMoney(s.variance), '') +
+        '</div>' +
+        '<div class="grid-2">' +
+          '<div class="card"><h3>Spend by Category</h3><div style="height:240px"><canvas id="chartExpCat"></canvas></div></div>' +
+          '<div class="card"><h3>Spend by Market</h3><div style="height:240px"><canvas id="chartExpMarket"></canvas></div></div>' +
+        '</div>' +
+        '<div class="card">' + App.table([
+          { key: 'date', label: 'Date', render: function (r) { return App.fmtDate(r.date); } },
+          { key: 'market', label: 'Market' }, { key: 'expenseCategory', label: 'Category' },
+          { key: 'expenseDescription', label: 'Description' }, { key: 'vendor', label: 'Vendor' },
+          { key: 'budgetedAmount', label: 'Budgeted', render: function (r) { return App.fmtMoney(r.budgetedAmount); } },
+          { key: 'actualAmount', label: 'Actual', render: function (r) { return App.fmtMoney(r.actualAmount); } },
+          { key: 'variance', label: 'Variance', render: function (r) { return App.fmtMoney(r.variance); } },
+          { key: 'paymentStatus', label: 'Payment', render: function (r) { return App.badge(r.paymentStatus, App.statusTone(r.paymentStatus)); } }
+        ], page.records, { actions: function (r) { return '<a data-edit-exp="' + r.expenseId + '">Edit</a><a data-del-exp="' + r.expenseId + '">Delete</a>'; } }) +
+        App.paginationControls(page, function (p) { pageState.page = p; load(); }) + '</div>'
+      );
+      setTimeout(function () {
+        App.pieChart('chartExpCat', Object.keys(s.byCategory || {}), Object.values(s.byCategory || {}));
+        App.pieChart('chartExpMarket', Object.keys(s.byMarket || {}), Object.values(s.byMarket || {}));
+      }, 0);
+      document.querySelectorAll('[data-edit-exp]').forEach(function (el) {
+        el.onclick = function () {
+          var rec = page.records.filter(function (r) { return r.expenseId === el.getAttribute('data-edit-exp'); })[0];
+          App.Forms.openExpenseForm(rec);
+        };
+      });
+      document.querySelectorAll('[data-del-exp]').forEach(function (el) {
+        el.onclick = function () { if (confirm('Delete expense?')) App.call('api_deleteExpense', el.getAttribute('data-del-exp')).then(function () { App.navigate('expenses'); }); };
+      });
     });
-    document.querySelectorAll('[data-del-exp]').forEach(function (el) {
-      el.onclick = function () { if (confirm('Delete expense?')) App.call('api_deleteExpense', el.getAttribute('data-del-exp')).then(function () { App.navigate('expenses'); }); };
-    });
-  });
+  }
 };
 
 // ---------------------------------------------------------------- Markets (heatmap)

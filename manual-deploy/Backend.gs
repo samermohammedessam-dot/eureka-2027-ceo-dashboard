@@ -20,19 +20,37 @@ function getOrCreateSheet(name) {
 
 /**
  * Reads all data rows of a sheet as an array of plain objects keyed by schema `key`.
- * Empty trailing rows are skipped. Adds `_row` (1-based sheet row number) to every object
- * so callers can write updates back without re-scanning.
+ * Adds `_row` (1-based sheet row number) to every object so callers can write updates back
+ * without re-scanning.
+ *
+ * getLastRow() is NOT a reliable "how many real records" signal on this project: setup
+ * forces every sheet to at least 500 rows and applies checkbox data validation to every
+ * boolean column across all of them (see runSetupValidation in SetupSheets.gs), and
+ * insertCheckboxes() writes a real FALSE into every one of those cells — which counts as
+ * content for getLastRow(), and does NOT stringify to '' (`[false].join('')` is `"false"`,
+ * not `""`), so the old "skip fully-blank rows" check let hundreds of placeholder rows
+ * through on any sheet with a boolean column that isn't otherwise re-seeded (Projects,
+ * Case Studies, Decisions in particular sit at getLastRow()===500 indefinitely since
+ * nothing ever seeds/clears them). The real signal for "is this a record" is the sheet's
+ * own primary ID column: a row a user or seeder actually created always has one, a leftover
+ * formatting row never does.
  */
 function readAllRecords(sheetName) {
   var sheet = ss_().getSheetByName(sheetName);
   if (!sheet || sheet.getLastRow() < 2) return [];
   var schema = getSchema(sheetName);
   var numCols = schema.length;
+  var idCol = schema.filter(function (c) { return c.idPrefix; })[0];
+  var idColIndex = idCol ? schema.indexOf(idCol) : -1;
   var values = sheet.getRange(2, 1, sheet.getLastRow() - 1, numCols).getValues();
   var records = [];
   for (var r = 0; r < values.length; r++) {
     var row = values[r];
-    if (row.join('') === '') continue; // fully blank row
+    if (idColIndex > -1) {
+      if (row[idColIndex] === '' || row[idColIndex] === null || row[idColIndex] === undefined) continue; // no ID => not a real record
+    } else if (row.join('') === '') {
+      continue; // sheets with no ID column (Master Plan, etc.): fall back to "fully blank row"
+    }
     var obj = { _row: r + 2 };
     for (var c = 0; c < schema.length; c++) {
       obj[schema[c].key] = row[c];
@@ -605,13 +623,18 @@ function stripRowMeta_(record) {
   return clean;
 }
 
+// Pagination controls, not filter criteria — applyFilters_ must never try to match a record
+// field against these (no record has a "page" or "pageSize" column, so a naive filter would
+// discard every row). See paginate_() in this file.
+var PAGINATION_KEYS_ = { page: true, pageSize: true };
+
 function applyFilters_(records, filters) {
   if (!filters) return records;
   return records.filter(function (r) {
     for (var key in filters) {
       var val = filters[key];
       if (val === undefined || val === null || val === '') continue;
-      if (key === '_search') continue;
+      if (key === '_search' || PAGINATION_KEYS_[key]) continue;
       if (String(r[key]) !== String(val)) return false;
     }
     if (filters._search) {
@@ -632,6 +655,35 @@ function safeCall_(fn) {
   }
 }
 
+/**
+ * Performance Sprint instrumentation: writes a timing line to the execution log (visible in
+ * the Apps Script editor's Executions view) so slow phases can be identified from real runs.
+ * Deliberately just Logger.log — no sheet writes, no state — safe to leave in permanently.
+ */
+function logTiming_(label, ms) {
+  Logger.log('[perf] ' + label + ': ' + ms + 'ms');
+}
+
+/**
+ * Opt-in server-side pagination: only slices when the caller actually asks for a page (see
+ * each api_get* that supports it) — omit `page` entirely and you get the old plain-array
+ * behavior, so existing narrow/filtered call sites (e.g. "tasks for this one week") are
+ * completely unaffected.
+ */
+function paginate_(records, filters) {
+  var page = Math.max(1, parseInt((filters && filters.page) || 1, 10) || 1);
+  var pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, parseInt((filters && filters.pageSize) || DEFAULT_PAGE_SIZE, 10) || DEFAULT_PAGE_SIZE));
+  var total = records.length;
+  var start = (page - 1) * pageSize;
+  return {
+    records: records.slice(start, start + pageSize),
+    total: total,
+    page: page,
+    pageSize: pageSize,
+    totalPages: Math.max(1, Math.ceil(total / pageSize))
+  };
+}
+
 // ============================================================
 // SOURCE: api/GenericCrudApi.gs
 // ============================================================
@@ -641,11 +693,13 @@ function safeCall_(fn) {
  * calculated fields: Target Accounts, Partnerships, Academy, Case Studies, Digital Roadmap,
  * Decisions, Risks, Projects, Clients, Team, Markets, Business Units.
  */
+/** Pass filters.page to get { records, total, page, pageSize, totalPages } instead of a plain array — see paginate_(). */
 function api_getGenericRecords(sheetName, filters) {
   return safeCall_(function () {
     assertGenericSheetAllowed_(sheetName);
     var records = readAllRecords(sheetName).map(stripRowMeta_);
-    return applyFilters_(records, filters);
+    var filtered = applyFilters_(records, filters);
+    return (filters && filters.page) ? paginate_(filtered, filters) : filtered;
   });
 }
 
@@ -655,31 +709,48 @@ function api_saveGenericRecord(sheetName, record) {
     var schema = getSchema(sheetName);
     var idCol = schema.filter(function (c) { return c.idPrefix; })[0];
     var idKey = idCol ? idCol.key : null;
+    var resultId;
     if (idKey && record[idKey]) {
       updateRecordById(sheetName, record[idKey], record);
-      recomputeAllCalculatedFields();
-      return record[idKey];
+      resultId = record[idKey];
+    } else {
+      resultId = appendRecord(sheetName, record);
     }
-    var newId = appendRecord(sheetName, record);
     recomputeAllCalculatedFields();
-    return newId;
+    invalidateCachesForSheet_(sheetName);
+    return resultId;
   });
 }
 
 function api_deleteGenericRecord(sheetName, idValue) {
   return safeCall_(function () {
     assertGenericSheetAllowed_(sheetName);
-    return deleteRecordById(sheetName, idValue);
+    var result = deleteRecordById(sheetName, idValue);
+    invalidateCachesForSheet_(sheetName);
+    return result;
   });
+}
+
+/** Team/Markets/Business Units/Clients feed api_getLookups(); every generic sheet can affect dashboard alerts (e.g. Projects). */
+function invalidateCachesForSheet_(sheetName) {
+  invalidateDashboardCache_();
+  if ([SHEETS.TEAM, SHEETS.MARKETS, SHEETS.BUSINESS_UNITS, SHEETS.CLIENTS].indexOf(sheetName) > -1) {
+    invalidateLookupsCache_();
+  }
 }
 
 // ============================================================
 // SOURCE: api/TasksApi.gs
 // ============================================================
 
+/** Pass filters.page to get { records, total, page, pageSize, totalPages } instead of a plain array — see paginate_(). */
 function api_getTasks(filters) {
   return safeCall_(function () {
-    return applyFilters_(readAllRecords(SHEETS.TASKS).map(stripRowMeta_), filters);
+    var tStart = new Date().getTime();
+    var all = applyFilters_(readAllRecords(SHEETS.TASKS).map(stripRowMeta_), filters);
+    var result = (filters && filters.page) ? paginate_(all, filters) : all;
+    logTiming_('api_getTasks', new Date().getTime() - tStart);
+    return result;
   });
 }
 
@@ -693,21 +764,28 @@ function api_saveTask(task) {
       appendRecord(SHEETS.TASKS, task);
     }
     recomputeTasks_();
+    invalidateDashboardCache_();
     return task.taskId || true;
   });
 }
 
 function api_deleteTask(taskId) {
-  return safeCall_(function () { return deleteRecordById(SHEETS.TASKS, taskId); });
+  return safeCall_(function () {
+    var result = deleteRecordById(SHEETS.TASKS, taskId);
+    invalidateDashboardCache_();
+    return result;
+  });
 }
 
 // ============================================================
 // SOURCE: api/RevenueApi.gs
 // ============================================================
 
+/** Pass filters.page to get { records, total, page, pageSize, totalPages } instead of a plain array — see paginate_(). */
 function api_getRevenue(filters) {
   return safeCall_(function () {
-    return applyFilters_(readAllRecords(SHEETS.REVENUE).map(stripRowMeta_), filters);
+    var all = applyFilters_(readAllRecords(SHEETS.REVENUE).map(stripRowMeta_), filters);
+    return (filters && filters.page) ? paginate_(all, filters) : all;
   });
 }
 
@@ -719,12 +797,17 @@ function api_saveRevenue(rec) {
       appendRecord(SHEETS.REVENUE, rec);
     }
     recomputeRevenue_();
+    invalidateDashboardCache_();
     return rec.revenueId || true;
   });
 }
 
 function api_deleteRevenue(id) {
-  return safeCall_(function () { return deleteRecordById(SHEETS.REVENUE, id); });
+  return safeCall_(function () {
+    var result = deleteRecordById(SHEETS.REVENUE, id);
+    invalidateDashboardCache_();
+    return result;
+  });
 }
 
 /** Section 10: outstanding, collection %, DSO, revenue vs targets — computed on demand for the Revenue view. */
@@ -756,9 +839,11 @@ function computeDSO_(records) {
 // SOURCE: api/ExpensesApi.gs
 // ============================================================
 
+/** Pass filters.page to get { records, total, page, pageSize, totalPages } instead of a plain array — see paginate_(). */
 function api_getExpenses(filters) {
   return safeCall_(function () {
-    return applyFilters_(readAllRecords(SHEETS.EXPENSES).map(stripRowMeta_), filters);
+    var all = applyFilters_(readAllRecords(SHEETS.EXPENSES).map(stripRowMeta_), filters);
+    return (filters && filters.page) ? paginate_(all, filters) : all;
   });
 }
 
@@ -770,12 +855,17 @@ function api_saveExpense(rec) {
       appendRecord(SHEETS.EXPENSES, rec);
     }
     recomputeExpenses_();
+    invalidateDashboardCache_();
     return rec.expenseId || true;
   });
 }
 
 function api_deleteExpense(id) {
-  return safeCall_(function () { return deleteRecordById(SHEETS.EXPENSES, id); });
+  return safeCall_(function () {
+    var result = deleteRecordById(SHEETS.EXPENSES, id);
+    invalidateDashboardCache_();
+    return result;
+  });
 }
 
 function api_getExpenseSummary() {
@@ -810,9 +900,11 @@ function groupSum_(records, groupKey, valueKey) {
 // SOURCE: api/PipelineApi.gs
 // ============================================================
 
+/** Pass filters.page to get { records, total, page, pageSize, totalPages } instead of a plain array — see paginate_(). */
 function api_getPipeline(filters) {
   return safeCall_(function () {
-    return applyFilters_(readAllRecords(SHEETS.PIPELINE).map(stripRowMeta_), filters);
+    var all = applyFilters_(readAllRecords(SHEETS.PIPELINE).map(stripRowMeta_), filters);
+    return (filters && filters.page) ? paginate_(all, filters) : all;
   });
 }
 
@@ -825,12 +917,17 @@ function api_savePipeline(rec) {
       appendRecord(SHEETS.PIPELINE, rec);
     }
     recomputePipeline_();
+    invalidateDashboardCache_();
     return rec.opportunityId || true;
   });
 }
 
 function api_deletePipeline(id) {
-  return safeCall_(function () { return deleteRecordById(SHEETS.PIPELINE, id); });
+  return safeCall_(function () {
+    var result = deleteRecordById(SHEETS.PIPELINE, id);
+    invalidateDashboardCache_();
+    return result;
+  });
 }
 
 /** Section 11: pipeline value, weighted pipeline, win rate, cycle, average deal, coverage, breakdowns. */
@@ -879,12 +976,19 @@ function api_saveCampaign(rec) {
       appendRecord(SHEETS.CAMPAIGNS, rec);
     }
     recomputeCampaigns_();
+    invalidateDashboardCache_();
+    invalidateLookupsCache_(); // campaign names feed the Campaign dropdown in api_getLookups
     return rec.campaignId || true;
   });
 }
 
 function api_deleteCampaign(id) {
-  return safeCall_(function () { return deleteRecordById(SHEETS.CAMPAIGNS, id); });
+  return safeCall_(function () {
+    var result = deleteRecordById(SHEETS.CAMPAIGNS, id);
+    invalidateDashboardCache_();
+    invalidateLookupsCache_();
+    return result;
+  });
 }
 
 // ============================================================
@@ -905,12 +1009,19 @@ function api_saveEvent(rec) {
       appendRecord(SHEETS.EVENTS, rec);
     }
     recomputeEvents_();
+    invalidateDashboardCache_();
+    invalidateLookupsCache_(); // event names feed the Event dropdown in api_getLookups
     return rec.eventId || true;
   });
 }
 
 function api_deleteEvent(id) {
-  return safeCall_(function () { return deleteRecordById(SHEETS.EVENTS, id); });
+  return safeCall_(function () {
+    var result = deleteRecordById(SHEETS.EVENTS, id);
+    invalidateDashboardCache_();
+    invalidateLookupsCache_();
+    return result;
+  });
 }
 
 // ============================================================
@@ -1025,21 +1136,64 @@ function round2_(n) { return Math.round(n * 100) / 100; }
 // ============================================================
 
 /**
- * Section 15: the CEO homepage. One call returns every number and chart series the
- * dashboard needs so the client makes a single round trip.
+ * Section 15: the CEO homepage. ONE call returns every number and chart series the
+ * dashboard needs (Performance Sprint: this replaced a version that additionally called
+ * computeAlerts_() with no arguments, which re-read Revenue/Expenses/Pipeline/Tasks/Markets
+ * a second time — every sheet below is now read exactly once per call).
+ *
+ * The assembled result is cached whole (DASHBOARD_CACHE_TTL_SECONDS) rather than caching
+ * each sheet's raw rows separately: simpler to reason about, and it also skips re-running
+ * every aggregation/alert computation on a cache hit, not just the sheet reads.
+ * invalidateDashboardCache_() (called after any Tasks/Pipeline/Revenue/Expenses/Campaigns/
+ * Events write — see those API files) clears it early so a save is reflected well within
+ * the cache's normal lifetime, not after up to 4 stale minutes.
  */
+function api_getDashboardBootstrap() {
+  return safeCall_(getDashboardBootstrapCached_);
+}
+
+// Old name kept as an alias: nothing else needs to change if some future code (or a custom
+// menu script) still calls api_getDashboard() directly — same payload shape either way.
 function api_getDashboard() {
-  return safeCall_(function () {
-    var revenue = readAllRecordsCached(SHEETS.REVENUE);
-    var expenses = readAllRecordsCached(SHEETS.EXPENSES);
-    var pipelineAll = readAllRecordsCached(SHEETS.PIPELINE);
-    var pipelineOpen = pipelineAll.filter(function (r) { return r.stage !== 'Won' && r.stage !== 'Lost'; });
-    var won = pipelineAll.filter(function (r) { return r.stage === 'Won'; });
-    var lost = pipelineAll.filter(function (r) { return r.stage === 'Lost'; });
-    var tasks = readAllRecordsCached(SHEETS.TASKS);
-    var plan = readAllRecordsCached(SHEETS.MASTER_PLAN);
-    var markets = readAllRecordsCached(SHEETS.MARKETS);
-    var businessUnits = readAllRecordsCached(SHEETS.BUSINESS_UNITS);
+  return api_getDashboardBootstrap();
+}
+
+function getDashboardBootstrapCached_() {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get(DASHBOARD_CACHE_KEY);
+  if (cached) {
+    try { return JSON.parse(cached); } catch (e) { /* corrupt/unexpected cache entry — fall through and rebuild */ }
+  }
+  var result = buildDashboardBootstrap_();
+  try {
+    cache.put(DASHBOARD_CACHE_KEY, JSON.stringify(result), DASHBOARD_CACHE_TTL_SECONDS);
+  } catch (e) {
+    // Payload too large for CacheService's 100KB-per-key limit — skip caching, still return fresh data.
+  }
+  return result;
+}
+
+function invalidateDashboardCache_() {
+  CacheService.getScriptCache().remove(DASHBOARD_CACHE_KEY);
+}
+
+function buildDashboardBootstrap_() {
+  var tStart = new Date().getTime();
+  var revenue = readAllRecords(SHEETS.REVENUE);
+  var expenses = readAllRecords(SHEETS.EXPENSES);
+  var pipelineAll = readAllRecords(SHEETS.PIPELINE);
+  var pipelineOpen = pipelineAll.filter(function (r) { return r.stage !== 'Won' && r.stage !== 'Lost'; });
+  var won = pipelineAll.filter(function (r) { return r.stage === 'Won'; });
+  var lost = pipelineAll.filter(function (r) { return r.stage === 'Lost'; });
+  var tasks = readAllRecords(SHEETS.TASKS);
+  var plan = readAllRecords(SHEETS.MASTER_PLAN);
+  var markets = readAllRecords(SHEETS.MARKETS);
+  var businessUnits = readAllRecords(SHEETS.BUSINESS_UNITS);
+  var projects = readAllRecords(SHEETS.PROJECTS);
+  var campaigns = readAllRecords(SHEETS.CAMPAIGNS);
+  var quarters = readAllRecords(SHEETS.QUARTERLY_REVIEW);
+  var tReads = new Date().getTime();
+  logTiming_('dashboardBootstrap.sheetReads', tReads - tStart);
 
     var revenueActual = sumBy(revenue, 'revenueRecognized');
     var bookingsActual = sumBy(revenue, 'contractValue');
@@ -1083,6 +1237,17 @@ function api_getDashboard() {
       return { month: mn, collected: sumBy(revenue, 'amountCollected', function (r) { return monthNameOf_(r.collectionDate) === mn; }) };
     });
 
+    var tAgg = new Date().getTime();
+    logTiming_('dashboardBootstrap.aggregation', tAgg - tReads);
+
+    var alerts = computeAlerts_({
+      revenue: revenue, expenses: expenses, pipelineAll: pipelineAll, tasks: tasks,
+      projects: projects, campaigns: campaigns, markets: markets, quarters: quarters
+    });
+    var tAlerts = new Date().getTime();
+    logTiming_('dashboardBootstrap.alerts', tAlerts - tAgg);
+    logTiming_('dashboardBootstrap.total', tAlerts - tStart);
+
     return {
       targets: { min: REVENUE_MIN, target: REVENUE_TARGET, stretch: REVENUE_STRETCH },
       headline: {
@@ -1105,9 +1270,8 @@ function api_getDashboard() {
         pipelineByStage: pipelineByStage,
         collectionsByMonth: collectionsByMonth
       },
-      alerts: computeAlerts_()
+      alerts: alerts
     };
-  });
 }
 
 function distinct_(arr) {
@@ -1126,20 +1290,27 @@ function distinct_(arr) {
  * external AI — so alerts are deterministic, explainable, and free to run as often as needed.
  */
 function api_getAlerts() {
-  return safeCall_(computeAlerts_);
+  return safeCall_(function () { return computeAlerts_(); });
 }
 
-function computeAlerts_() {
+/**
+ * Accepts an optional `data` bag of already-loaded record arrays so a caller that already
+ * read these sheets (the dashboard bootstrap) doesn't make Alerts read every one of them
+ * again — reads only what's missing from `data`, so calling this with no argument at all
+ * still works exactly as before.
+ */
+function computeAlerts_(data) {
+  data = data || {};
   var alerts = [];
-  var revenue = readAllRecords(SHEETS.REVENUE);
-  var expenses = readAllRecords(SHEETS.EXPENSES);
-  var pipelineAll = readAllRecords(SHEETS.PIPELINE);
+  var revenue = data.revenue || readAllRecords(SHEETS.REVENUE);
+  var expenses = data.expenses || readAllRecords(SHEETS.EXPENSES);
+  var pipelineAll = data.pipelineAll || readAllRecords(SHEETS.PIPELINE);
   var pipelineOpen = pipelineAll.filter(function (r) { return r.stage !== 'Won' && r.stage !== 'Lost'; });
-  var tasks = readAllRecords(SHEETS.TASKS);
-  var projects = readAllRecords(SHEETS.PROJECTS);
-  var campaigns = readAllRecords(SHEETS.CAMPAIGNS);
-  var markets = readAllRecords(SHEETS.MARKETS);
-  var quarters = readAllRecords(SHEETS.QUARTERLY_REVIEW);
+  var tasks = data.tasks || readAllRecords(SHEETS.TASKS);
+  var projects = data.projects || readAllRecords(SHEETS.PROJECTS);
+  var campaigns = data.campaigns || readAllRecords(SHEETS.CAMPAIGNS);
+  var markets = data.markets || readAllRecords(SHEETS.MARKETS);
+  var quarters = data.quarters || readAllRecords(SHEETS.QUARTERLY_REVIEW);
   var today = todayMidnight_();
 
   var revenueActual = sumBy(revenue, 'revenueRecognized');
@@ -1402,27 +1573,53 @@ function generateCeoSummary_(month, m) {
 // SOURCE: api/LookupsApi.gs
 // ============================================================
 
-/** Everything the frontend needs to populate dropdowns, filters, and form selects in one call. */
+/**
+ * Everything the frontend needs to populate dropdowns, filters, and form selects, in one
+ * call. Master/reference data changes rarely, so this is cached whole for
+ * LOOKUPS_CACHE_TTL_SECONDS (see invalidateLookupsCache_, called from the generic-CRUD and
+ * Campaigns/Events save/delete endpoints whenever a sheet this reads from changes).
+ */
 function api_getLookups() {
   return safeCall_(function () {
-    return {
-      taskStatus: TASK_STATUS, taskPriority: TASK_PRIORITY, taskCategories: TASK_CATEGORIES,
-      expenseCategories: EXPENSE_CATEGORIES, paymentStatus: PAYMENT_STATUS, paymentMethods: PAYMENT_METHODS,
-      collectionStatus: COLLECTION_STATUS, salesStages: SALES_STAGES, campaignTypes: CAMPAIGN_TYPES,
-      eventTypes: EVENT_TYPES, accountTiers: ACCOUNT_TIERS, riskCategories: RISK_CATEGORIES,
-      riskStatus: RISK_STATUS, decisionStatus: DECISION_STATUS, countries: COUNTRIES,
-      markets: readAllRecords(SHEETS.MARKETS).map(function (m) { return m.market; }),
-      businessUnits: distinct_(readAllRecords(SHEETS.BUSINESS_UNITS).map(function (b) { return b.businessUnit; })),
-      services: readAllRecords(SHEETS.BUSINESS_UNITS).map(function (b) { return b.service; }),
-      team: readAllRecords(SHEETS.TEAM).map(function (t) { return t.name; }),
-      weeks: readAllRecords(SHEETS.WEEKLY_EXECUTION).map(function (w) { return { weekId: w.weekId, label: 'Week ' + w.weekNumber + ' (' + w.month + ')' }; }),
-      months: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
-      quarters: ['Q1', 'Q2', 'Q3', 'Q4'],
-      campaigns: readAllRecords(SHEETS.CAMPAIGNS).map(function (c) { return c.campaign; }),
-      events: readAllRecords(SHEETS.EVENTS).map(function (e) { return e.eventName; }),
-      clients: readAllRecords(SHEETS.CLIENTS).map(function (c) { return c.clientName; })
-    };
+    var cache = CacheService.getScriptCache();
+    var cached = cache.get(LOOKUPS_CACHE_KEY);
+    if (cached) {
+      try { return JSON.parse(cached); } catch (e) { /* fall through and rebuild */ }
+    }
+    var result = buildLookups_();
+    try {
+      cache.put(LOOKUPS_CACHE_KEY, JSON.stringify(result), LOOKUPS_CACHE_TTL_SECONDS);
+    } catch (e) { /* too large for cache — still return fresh data */ }
+    return result;
   });
+}
+
+function invalidateLookupsCache_() {
+  CacheService.getScriptCache().remove(LOOKUPS_CACHE_KEY);
+}
+
+function buildLookups_() {
+  var tStart = new Date().getTime();
+  var businessUnits = readAllRecords(SHEETS.BUSINESS_UNITS); // read once — was previously read twice (once for businessUnits, once for services)
+  var result = {
+    taskStatus: TASK_STATUS, taskPriority: TASK_PRIORITY, taskCategories: TASK_CATEGORIES,
+    expenseCategories: EXPENSE_CATEGORIES, paymentStatus: PAYMENT_STATUS, paymentMethods: PAYMENT_METHODS,
+    collectionStatus: COLLECTION_STATUS, salesStages: SALES_STAGES, campaignTypes: CAMPAIGN_TYPES,
+    eventTypes: EVENT_TYPES, accountTiers: ACCOUNT_TIERS, riskCategories: RISK_CATEGORIES,
+    riskStatus: RISK_STATUS, decisionStatus: DECISION_STATUS, countries: COUNTRIES,
+    markets: readAllRecords(SHEETS.MARKETS).map(function (m) { return m.market; }),
+    businessUnits: distinct_(businessUnits.map(function (b) { return b.businessUnit; })),
+    services: businessUnits.map(function (b) { return b.service; }),
+    team: readAllRecords(SHEETS.TEAM).map(function (t) { return t.name; }),
+    weeks: readAllRecords(SHEETS.WEEKLY_EXECUTION).map(function (w) { return { weekId: w.weekId, label: 'Week ' + w.weekNumber + ' (' + w.month + ')' }; }),
+    months: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+    quarters: ['Q1', 'Q2', 'Q3', 'Q4'],
+    campaigns: readAllRecords(SHEETS.CAMPAIGNS).map(function (c) { return c.campaign; }),
+    events: readAllRecords(SHEETS.EVENTS).map(function (e) { return e.eventName; }),
+    clients: readAllRecords(SHEETS.CLIENTS).map(function (c) { return c.clientName; })
+  };
+  logTiming_('lookups.build', new Date().getTime() - tStart);
+  return result;
 }
 
 function api_getSettings() {

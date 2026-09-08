@@ -3,20 +3,27 @@
  * external AI — so alerts are deterministic, explainable, and free to run as often as needed.
  */
 function api_getAlerts() {
-  return safeCall_(computeAlerts_);
+  return safeCall_(function () { return computeAlerts_(); });
 }
 
-function computeAlerts_() {
+/**
+ * Accepts an optional `data` bag of already-loaded record arrays so a caller that already
+ * read these sheets (the dashboard bootstrap) doesn't make Alerts read every one of them
+ * again — reads only what's missing from `data`, so calling this with no argument at all
+ * still works exactly as before.
+ */
+function computeAlerts_(data) {
+  data = data || {};
   var alerts = [];
-  var revenue = readAllRecords(SHEETS.REVENUE);
-  var expenses = readAllRecords(SHEETS.EXPENSES);
-  var pipelineAll = readAllRecords(SHEETS.PIPELINE);
+  var revenue = data.revenue || readAllRecords(SHEETS.REVENUE);
+  var expenses = data.expenses || readAllRecords(SHEETS.EXPENSES);
+  var pipelineAll = data.pipelineAll || readAllRecords(SHEETS.PIPELINE);
   var pipelineOpen = pipelineAll.filter(function (r) { return r.stage !== 'Won' && r.stage !== 'Lost'; });
-  var tasks = readAllRecords(SHEETS.TASKS);
-  var projects = readAllRecords(SHEETS.PROJECTS);
-  var campaigns = readAllRecords(SHEETS.CAMPAIGNS);
-  var markets = readAllRecords(SHEETS.MARKETS);
-  var quarters = readAllRecords(SHEETS.QUARTERLY_REVIEW);
+  var tasks = data.tasks || readAllRecords(SHEETS.TASKS);
+  var projects = data.projects || readAllRecords(SHEETS.PROJECTS);
+  var campaigns = data.campaigns || readAllRecords(SHEETS.CAMPAIGNS);
+  var markets = data.markets || readAllRecords(SHEETS.MARKETS);
+  var quarters = data.quarters || readAllRecords(SHEETS.QUARTERLY_REVIEW);
   var today = todayMidnight_();
 
   var revenueActual = sumBy(revenue, 'revenueRecognized');

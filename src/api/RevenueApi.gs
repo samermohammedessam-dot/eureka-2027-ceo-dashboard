@@ -1,6 +1,8 @@
+/** Pass filters.page to get { records, total, page, pageSize, totalPages } instead of a plain array — see paginate_(). */
 function api_getRevenue(filters) {
   return safeCall_(function () {
-    return applyFilters_(readAllRecords(SHEETS.REVENUE).map(stripRowMeta_), filters);
+    var all = applyFilters_(readAllRecords(SHEETS.REVENUE).map(stripRowMeta_), filters);
+    return (filters && filters.page) ? paginate_(all, filters) : all;
   });
 }
 
@@ -12,12 +14,17 @@ function api_saveRevenue(rec) {
       appendRecord(SHEETS.REVENUE, rec);
     }
     recomputeRevenue_();
+    invalidateDashboardCache_();
     return rec.revenueId || true;
   });
 }
 
 function api_deleteRevenue(id) {
-  return safeCall_(function () { return deleteRecordById(SHEETS.REVENUE, id); });
+  return safeCall_(function () {
+    var result = deleteRecordById(SHEETS.REVENUE, id);
+    invalidateDashboardCache_();
+    return result;
+  });
 }
 
 /** Section 10: outstanding, collection %, DSO, revenue vs targets — computed on demand for the Revenue view. */

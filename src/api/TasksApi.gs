@@ -1,6 +1,11 @@
+/** Pass filters.page to get { records, total, page, pageSize, totalPages } instead of a plain array — see paginate_(). */
 function api_getTasks(filters) {
   return safeCall_(function () {
-    return applyFilters_(readAllRecords(SHEETS.TASKS).map(stripRowMeta_), filters);
+    var tStart = new Date().getTime();
+    var all = applyFilters_(readAllRecords(SHEETS.TASKS).map(stripRowMeta_), filters);
+    var result = (filters && filters.page) ? paginate_(all, filters) : all;
+    logTiming_('api_getTasks', new Date().getTime() - tStart);
+    return result;
   });
 }
 
@@ -14,10 +19,15 @@ function api_saveTask(task) {
       appendRecord(SHEETS.TASKS, task);
     }
     recomputeTasks_();
+    invalidateDashboardCache_();
     return task.taskId || true;
   });
 }
 
 function api_deleteTask(taskId) {
-  return safeCall_(function () { return deleteRecordById(SHEETS.TASKS, taskId); });
+  return safeCall_(function () {
+    var result = deleteRecordById(SHEETS.TASKS, taskId);
+    invalidateDashboardCache_();
+    return result;
+  });
 }

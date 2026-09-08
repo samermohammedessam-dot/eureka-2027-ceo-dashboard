@@ -12,10 +12,17 @@ function api_saveCampaign(rec) {
       appendRecord(SHEETS.CAMPAIGNS, rec);
     }
     recomputeCampaigns_();
+    invalidateDashboardCache_();
+    invalidateLookupsCache_(); // campaign names feed the Campaign dropdown in api_getLookups
     return rec.campaignId || true;
   });
 }
 
 function api_deleteCampaign(id) {
-  return safeCall_(function () { return deleteRecordById(SHEETS.CAMPAIGNS, id); });
+  return safeCall_(function () {
+    var result = deleteRecordById(SHEETS.CAMPAIGNS, id);
+    invalidateDashboardCache_();
+    invalidateLookupsCache_();
+    return result;
+  });
 }
