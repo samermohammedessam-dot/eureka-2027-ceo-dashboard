@@ -69,8 +69,12 @@ def load_manifest():
     p = lambda r: os.path.join(ASSETS, r)
     m['eureka_logo'] = p(m['eureka_logo'])
     m['team_photos'] = [p(x) for x in m.get('team_photos', [])]
+    m['extra_photos'] = [p(x) for x in m.get('extra_photos', [])]
+    m['gahar_seal'] = p(m['gahar_seal']) if m.get('gahar_seal') else None
     for inst in m['institutions']:
-        inst['logo'] = p(inst['logo'])
+        inst['logo'] = p(inst['logo']) if inst.get('logo') else None
+        if inst['logo'] and inst.get('logo_crop'):
+            inst['logo'] += '#crop=' + ','.join(str(v) for v in inst['logo_crop'])
         inst['photos'] = [p(x) for x in inst.get('photos', [])]
     return m
 
@@ -98,15 +102,21 @@ def photo_pool():
     """Team photos first, then institution photos – used by the montages."""
     m = manifest()
     pool = list(m['team_photos'])
-    extra = [p for inst in m['institutions'] for p in inst['photos']]
+    extra = [p for inst in m['institutions'] for p in inst['photos']] + m['extra_photos']
+    # interleave institution photos so montages mix Eureka team and partner moments
+    extra = extra[::3] + extra[1::3] + extra[2::3]
     return pool + [p for p in extra if p not in pool]
 
 
 @functools.lru_cache(maxsize=64)
 def logo_image(path):
     """Load a logo and trim its empty margins (transparent or flat background)."""
+    path, _, crop = path.partition('#crop=')
     im = Image.open(path)
     im = ImageOps.exif_transpose(im).convert('RGBA')
+    if crop:  # manual crop (fractions) for logos whose background can't be auto-trimmed
+        l, t_, r, b = (float(v) for v in crop.split(','))
+        im = im.crop((int(l * im.width), int(t_ * im.height), int(r * im.width), int(b * im.height)))
     a = np.asarray(im)
     if a[..., 3].min() < 250:
         mask = a[..., 3] > 12
@@ -338,7 +348,7 @@ def kb_box(img, w, h, p, seed, zoom=0.14):
     z = lerp(1.0, 1 + zoom, p) if zin else lerp(1 + zoom, 1.0, p)
     cw, ch = bw / z, bh / z
     dx0, dx1 = rnd.uniform(-1, 1, 2)
-    dy0, dy1 = rnd.uniform(-0.6, 0.3, 2)  # bias upwards: people's faces live in the upper half
+    dy0, dy1 = rnd.uniform(-0.75, -0.05, 2)  # bias upwards: keep heads in frame
     q = ease_io(p)
     cx = iw / 2 + lerp(dx0, dx1, q) * (iw - cw) / 2
     cy = ih / 2 + lerp(dy0, dy1, q) * (ih - ch) / 2
@@ -351,6 +361,24 @@ def photo_crop(path, w, h, p=0.0, seed=0, zoom=0.14):
     img = photo(path)
     out = img.resize((w, h), Image.BILINEAR, box=kb_box(img, w, h, p, seed, zoom), reducing_gap=2.0)
     return np.asarray(out, np.float32) / 255
+
+
+def contain(path, maxw, maxh):
+    """Size that shows the whole photo inside maxw x maxh (no one gets cropped out)."""
+    iw, ih = photo(path).size
+    s = min(maxw / iw, maxh / ih)
+    return int(iw * s), int(ih * s)
+
+
+def is_portrait(path, limit=1.25):
+    iw, ih = photo(path).size
+    return iw / ih < limit
+
+
+@functools.lru_cache(maxsize=32)
+def blurred_full(path):
+    small = ImageOps.fit(photo(path), (480, 270), Image.BILINEAR).filter(ImageFilter.GaussianBlur(9))
+    return np.asarray(small.resize((W, H), Image.BILINEAR), np.float32) / 255
 
 
 @functools.lru_cache(maxsize=None)
@@ -405,6 +433,8 @@ def plaque(path, w, h, pad_frac=0.11, radius=22, frame=4):
     s = min(bw / logo.width, bh / logo.height)
     lw, lh = max(1, int(logo.width * s)), max(1, int(logo.height * s))
     lg = logo.resize((lw, lh), Image.LANCZOS)
+    if s > 1.4:  # small source logo: restore edge crispness after upscaling
+        lg = lg.filter(ImageFilter.UnsharpMask(radius=2, percent=90, threshold=2))
     card.alpha_composite(lg, (m + (w - lw) // 2, m + (h - lh) // 2))
     glow = Image.new('L', card.size, 0)
     ImageDraw.Draw(glow).rounded_rectangle((m, m, m + w, m + h), radius, fill=255)
@@ -413,8 +443,66 @@ def plaque(path, w, h, pad_frac=0.11, radius=22, frame=4):
 
 
 @functools.lru_cache(maxsize=None)
-def eureka_layer(width):
+def name_card(name, w, h, radius=22, frame=4):
+    """Used only when no logo file was supplied: the institution's name set in type
+    on the same gold-framed card (never an invented logo)."""
+    m = 40
+    card = Image.new('RGBA', (w + 2 * m, h + 2 * m), (0, 0, 0, 0))
+    d = ImageDraw.Draw(card)
+    d.rounded_rectangle((m, m, m + w, m + h), radius, fill=(222, 186, 104, 255))
+    d.rounded_rectangle((m + frame, m + frame, m + w - frame, m + h - frame), radius - 3, fill=(255, 255, 255, 255))
+    inset = 9 + frame
+    d.rounded_rectangle((m + inset, m + inset, m + w - inset, m + h - inset), max(4, radius - 10),
+                        outline=(201, 162, 75, 200), width=1)
+    words = name.split()
+    lines = [name] if len(words) == 1 else [' '.join(words[:len(words) // 2]), ' '.join(words[len(words) // 2:])]
+    size = int(h * 0.28)
+    f = font('cinzel', size, 800)
+    while max(f.getlength(l) for l in lines) > w * 0.82:
+        size -= 2
+        f = font('cinzel', size, 800)
+    lh = size * 1.15
+    y0 = m + h / 2 - lh * len(lines) / 2
+    for k, l in enumerate(lines):
+        d.text((m + w / 2, y0 + k * lh + lh / 2), l, font=f, fill=(26, 43, 76, 255), anchor='mm')
+    glow = Image.new('L', card.size, 0)
+    ImageDraw.Draw(glow).rounded_rectangle((m, m, m + w, m + h), radius, fill=255)
+    return Layer(card, glow.filter(ImageFilter.GaussianBlur(18)))
+
+
+def inst_card(inst, w, h, **kw):
+    if inst['logo']:
+        return plaque(inst['logo'], w, h, **kw)
+    return name_card(inst['name'], w, h, kw.get('radius', 22), kw.get('frame', 4))
+
+
+@functools.lru_cache(maxsize=None)
+def seal_layer(d):
+    """The official GAHAR 'Accredited' seal, cut to its circle."""
+    path = manifest()['gahar_seal']
+    if not path:
+        return None
+    im = ImageOps.exif_transpose(Image.open(path)).convert('RGB')
+    side = min(im.size)
+    im = ImageOps.fit(im, (side, side)).resize((d, d), Image.LANCZOS)
+    im = im.filter(ImageFilter.UnsharpMask(radius=2, percent=70, threshold=2))
+    mask = Image.new('L', (d * 4, d * 4), 0)
+    ImageDraw.Draw(mask).ellipse((10, 10, d * 4 - 10, d * 4 - 10), fill=255)
+    mask = mask.resize((d, d), Image.LANCZOS)
+    m = 30
+    out = Image.new('RGBA', (d + 2 * m, d + 2 * m), (0, 0, 0, 0))
+    im.putalpha(mask)
+    out.alpha_composite(im, (m, m))
+    glow = Image.new('L', out.size, 0)
+    ImageDraw.Draw(glow).ellipse((m, m, m + d, m + d), fill=255)
+    return Layer(out, glow.filter(ImageFilter.GaussianBlur(16)))
+
+
+@functools.lru_cache(maxsize=None)
+def eureka_layer(width, max_h=None):
     logo, bg = logo_image(manifest()['eureka_logo'])
+    if max_h and width * logo.height / logo.width > max_h * 0.84:
+        width = int(max_h * 0.84 * logo.width / logo.height)
     a = np.asarray(logo, np.float32) / 255
     if bg is None:
         lum = (a[..., :3] @ [0.3, 0.59, 0.11])[a[..., 3] > 0.5].mean()
@@ -598,7 +686,7 @@ def scene1(cv, t):
     add_light(cv, L, GOLD_HI, 0.55 * seg(t, 0.4, 3.0))
     add_light(cv, radial(W / 2, 400, 420), GOLD, 0.45 * seg(t, 2.6, 4.2))
     DUST.draw(cv, t, seg(t, 0.2, 2.0))
-    lay = eureka_layer(620)
+    lay = eureka_layer(620, 470)
     p = seg(t, 2.9, 4.6)
     if p > 0:
         composite(cv, lay, W / 2, 400, lerp(0.9, 1.0, ease_out(p)), ease_io(p), glow=0.55 * p)
@@ -632,8 +720,15 @@ def scene2(cv, t):
             draw_photo(cv, arr, x0 + j * (pw + gap), 90 + int((1 - q) * (300 if j % 2 else -300)), q * 0.92)
     else:
         path = pool[k % len(pool)]
-        cv[:] = photo_crop(path, W, H, (t - 10 - k + 0.15) / 1.3, seed=k * 3 + 1, zoom=0.12)
-    cv *= 0.58 * vignette(0.7)
+        if is_portrait(path):  # whole photo, framed, over its own blurred backdrop
+            cv[:] = blurred_full(path) * 0.45
+            pw, ph = contain(path, 1500, 960)
+            z = 1 + 0.04 * u
+            pw2, ph2 = int(pw * z), int(ph * z)
+            draw_photo(cv, photo_crop(path, pw2, ph2, 0, seed=0, zoom=0.0), (W - pw2) // 2, (H - ph2) // 2, 1.0)
+        else:
+            cv[:] = photo_crop(path, W, H, (t - 10 - k + 0.15) / 1.3, seed=k * 3 + 1, zoom=0.12)
+    cv *= 0.62 * vignette(0.7)
     add_light(cv, radial(lerp(-200, W + 200, u), 200 + 300 * (k % 2), 520), np.array([1.0, 0.62, 0.25]), 0.22)
     flash(cv, 0.4 * math.exp(-u / 0.09))
     DUST_FAST.draw(cv, t, 0.6)
@@ -655,6 +750,10 @@ def scene3_title(cv, t):
     add_light(cv, rays(W / 2, 470, t, n=16), GOLD_HI, 0.5 * (0.45 + 0.55 * math.exp(-u / 0.8)))
     flash(cv, 1.2 * math.exp(-u / 0.25))
     DUST.draw(cv, t, 0.9)
+    seal = seal_layer(200)
+    if seal:
+        qs = seg(u, 0.05, 0.6)
+        composite(cv, seal, W / 2, 270, 0.6 + 0.4 * ease_back(qs), qs, glow=0.6)
     q1 = seg(u, 0.15, 0.8)
     composite(cv, text_layer('CELEBRATING OUR PARTNERS', 'cinzel', 100, 700, 8, 'gold', 14), W / 2, 460,
               lerp(1.12, 1.0, ease_out(q1)), ease_io(q1), glow=1.0, shine=seg(u, 1.0, 2.2) if 1.0 < u < 2.2 else None)
@@ -677,7 +776,7 @@ def institution_slot(cv, t, i, inst):
     cv[:] = inst_bg(i) * (1 + 0.15 * math.exp(-u / 0.6))
     hero_c = (W / 2, 450)
     side_c = (W / 2 + side * 470, 470)
-    mv = ease_io(seg(u, 1.25, 1.75))
+    mv = ease_io(seg(u, 1.25, 1.75)) if photos else 0.0
     cx, cy = lerp(hero_c[0], side_c[0], mv), lerp(hero_c[1], side_c[1], mv)
     add_light(cv, rays(cx, cy, t, n=14, reach=700), GOLD_HI, 0.6 * math.exp(-u / 0.7) + 0.16)
     flash(cv, 0.75 * math.exp(-u / 0.12), cx, cy, 700)
@@ -696,13 +795,13 @@ def institution_slot(cv, t, i, inst):
         else:
             panel_gallery(cv, u, photos, starts, ax, ay, area_w, area_h, i, side)
     # logo plaque (drawn last: always on top and fully readable)
-    pl = plaque(inst['logo'], 760, 430)
+    pl = inst_card(inst, 760, 430)
     sc = (0.55 + 0.45 * ease_back(seg(u, 0.0, 0.55))) * lerp(1.0, 0.82, mv)
     composite(cv, pl, cx, cy, sc, seg(u, 0.0, 0.18), glow=0.35 + 0.5 * math.exp(-u / 0.4))
     tag = text_layer(f'GAHAR ACCREDITATION  ·  {i + 1:02d}', 'mont', 26, 600, 6, 'gold', 4)
     q = seg(u, 0.3, 0.7)
     composite(cv, tag, cx, cy - 430 * sc / 2 - 52, 1.0, ease_io(q), glow=0.5)
-    lines = fit_text_lines(inst['name'].upper(), 'cinzel', 50, 700, 720 if mv < 0.5 else 640, 3, 'gold', 8)
+    lines = fit_text_lines(inst['name'], 'cinzel', 50, 700, 720 if mv < 0.5 else 640, 3, 'gold', 8)
     q = seg(u, 0.4, 0.85)
     y = cy + 430 * sc / 2 + 62
     for ln in lines:
@@ -720,8 +819,9 @@ def single_gallery(cv, u, photos, starts, ax, ay, aw, ah, i):
             continue
         q = ease_out(seg(u, s, s + 0.35))
         o = q if j == 0 else seg(u, s, s + 0.3)
-        arr = photo_crop(photos[j], aw, ah, seg(u, s, 4.0), seed=i * 11 + j, zoom=0.1)
-        draw_photo(cv, arr, ax + int((1 - q) * 60 * (-1) ** i), ay, o)
+        pw, ph = contain(photos[j], aw, ah) if is_portrait(photos[j]) else (aw, ah)
+        arr = photo_crop(photos[j], pw, ph, seg(u, s, 4.0), seed=i * 11 + j, zoom=0.1 if pw == aw else 0.04)
+        draw_photo(cv, arr, ax + (aw - pw) // 2 + int((1 - q) * 60 * (-1) ** i), ay + (ah - ph) // 2, o)
         flash(cv, 0.35 * math.exp(-(u - s) / 0.1), ax + aw / 2, ay + ah / 2, 600)
 
 
@@ -730,10 +830,10 @@ OFFS = [(-110, -50), (90, 30), (-40, 70), (120, -60)]
 
 
 def stack_gallery(cv, u, photos, starts, ax, ay, aw, ah, i):
-    pw, ph = 600, 400
     for j, s in enumerate(starts):
         if u < s:
             continue
+        pw, ph = (400, 540) if is_portrait(photos[j], 1.0) else (600, 420)
         q = ease_out(seg(u, s, s + 0.32))
         arr = photo_crop(photos[j], pw, ph, 0.0, seed=i * 13 + j, zoom=0.0)
         fr = 16  # ivory print border + gold hairline
@@ -770,16 +870,21 @@ def panel_gallery(cv, u, photos, starts, ax, ay, aw, ah, i, side):
         reveal = max(1, int(bh * q))
         arr = photo_crop(photos[j], bw, bh, seg(u, s, 4.2), seed=i * 17 + j, zoom=0.1)
         if j % 2 == 0:
-            draw_photo(cv, arr[:reveal], bx, by, 1.0, shadow=0.5)
+            draw_photo(cv, arr[:reveal], bx, by, 1.0, shadow=0.5, border=3 if reveal > 8 else 0)
         else:
-            draw_photo(cv, arr[bh - reveal:], bx, by + bh - reveal, 1.0, shadow=0.5)
+            draw_photo(cv, arr[bh - reveal:], bx, by + bh - reveal, 1.0, shadow=0.5, border=3 if reveal > 8 else 0)
         flash(cv, 0.3 * math.exp(-(u - s) / 0.1), bx + bw / 2, by + bh / 2, 400)
 
 
 @functools.lru_cache(maxsize=12)
 def inst_bg(i):
     inst = manifest()['institutions'][i]
-    src = photo(inst['photos'][0]) if inst['photos'] else logo_image(inst['logo'])[0].convert('RGB')
+    if inst['photos']:
+        src = photo(inst['photos'][0])
+    elif inst['logo']:
+        src = logo_image(inst['logo'])[0].convert('RGB')
+    else:
+        src = Image.new('RGB', (480, 270), (26, 43, 76))
     small = ImageOps.fit(src, (480, 270), Image.BILINEAR).filter(ImageFilter.GaussianBlur(10))
     arr = np.asarray(small.resize((W, H), Image.BILINEAR), np.float32) / 255
     return (arr * 0.32 + NAVY * 0.45) * vignette(0.75)
@@ -852,9 +957,10 @@ def scene4(cv, t):
         u = (t - 66) - k * step
         pool = photo_pool()
         path = pool[(k * 5 + 2) % len(pool)]
-        arr = photo_crop(path, 1120, 680, u / step, seed=k + 40, zoom=0.08)
+        pw, ph = contain(path, 1120, 760) if is_portrait(path) else (1120, 680)
+        arr = photo_crop(path, pw, ph, u / step, seed=k + 40, zoom=0.08 if pw == 1120 else 0.03)
         q = ease_out(seg(u, 0, 0.18))
-        draw_photo(cv, arr, (W - 1120) // 2, (H - 680) // 2 + int((1 - q) * 40), 1.0, border=4)
+        draw_photo(cv, arr, (W - pw) // 2, (H - ph) // 2 + int((1 - q) * 40), 1.0, border=4)
         flash(cv, 0.3 * math.exp(-u / 0.08))
     add_light(cv, streak((t - 64) % 2 / 2, angle=-0.4), GOLD_HI, 0.25)
     DUST_FAST.draw(cv, t, 0.8)
@@ -919,6 +1025,10 @@ def scene5(cv, t):
               720 + 20 * (1 - ease_out(q1)), 1.0, ease_io(q1), glow=0.9)
     composite(cv, text_layer('ACHIEVEMENTS', 'cinzel', 70, 700, 22, 'gold', 12), W / 2,
               812 + 20 * (1 - ease_out(q2)), 1.0, ease_io(q2), glow=0.9)
+    seal = seal_layer(150)
+    if seal and u > 2.4:
+        qs = seg(u, 2.4, 2.8)
+        composite(cv, seal, W / 2, 972, 0.6 + 0.4 * ease_back(qs), qs, glow=0.5 + 0.8 * math.exp(-(u - 2.4) / 0.3))
     lw = int(560 * ease_out(seg(u, 1.2, 2.0)))
     if lw > 2:
         cv[870:872, W // 2 - lw // 2:W // 2 + lw // 2] += GOLD_HI
@@ -930,7 +1040,7 @@ def scene5(cv, t):
             continue
         q = seg(u, s, s + 0.32)
         y += 6 * math.sin(t * 1.6 + k)
-        composite(cv, plaque(inst['logo'], 300, 168, pad_frac=0.08, radius=16, frame=3), x, y,
+        composite(cv, inst_card(inst, 300, 168, pad_frac=0.08, radius=16, frame=3), x, y,
                   0.5 + 0.5 * ease_back(q), seg(u, s, s + 0.12), glow=0.3 + 0.9 * math.exp(-(u - s) / 0.25))
         if u - s < 0.2:
             splat(cv, x, y - 95, 10, 0.8 * (1 - (u - s) / 0.2))
@@ -946,7 +1056,7 @@ def scene6(cv, t):
     add_light(cv, radial(W / 2, 360, 480), GOLD, 0.35)
     DUST.draw(cv, t, 1.0)
     CONF_RAIN2.draw(cv, t, 1 - seg(u, 2.5, 4.5))
-    lay = eureka_layer(640)
+    lay = eureka_layer(640, 400)
     q = seg(u, 0.0, 1.0)
     composite(cv, lay, W / 2, 360, lerp(0.92, 1.0, ease_out(q)), ease_io(seg(u, 0, 0.4)), glow=0.55)
     q1 = seg(u, 0.6, 1.3)
