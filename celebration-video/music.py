@@ -377,7 +377,7 @@ def reverb_ir(seconds, decay, lp):
     return irs / np.sqrt((irs ** 2).sum(axis=1, keepdims=True))
 
 
-def mix(buses, post):
+def mix(buses, post, arc=None):
     sends = {'pad': 0.55, 'str': 0.35, 'brass': 0.45, 'bell': 0.55, 'perc': 0.18, 'fx': 0.3, 'low': 0.1}
     gains = {'pad': 1.0, 'str': 1.0, 'brass': 1.1, 'bell': 0.9, 'perc': 1.0, 'fx': 0.9, 'low': 0.8}
     dry = np.zeros((2, N), np.float32)
@@ -398,8 +398,8 @@ def mix(buses, post):
     out /= np.abs(out).max()
     # dynamic arc: elegant intro -> celebration -> climax, plus the dramatic silence
     t = np.arange(N) / SR
-    keys_t = [0, 9.5, 10, 19.5, 20, 63.5, 64, 75.9, 76.05, 76.95, 77.0, 85, 90]
-    keys_db = [-11, -9, -7.5, -5, -2.5, -2.5, -1.5, -0.5, -26, -26, 0, 0, 0]
+    keys_t, keys_db = arc or ([0, 9.5, 10, 19.5, 20, 63.5, 64, 75.9, 76.05, 76.95, 77.0, 85, 90],
+                              [-11, -9, -7.5, -5, -2.5, -2.5, -1.5, -0.5, -26, -26, 0, 0, 0])
     out *= 10 ** (np.interp(t, keys_t, keys_db) / 20)
     out += np.stack([post.L, post.R]) * 0.5
     out = np.tanh(out * 1.6) / np.tanh(1.6)

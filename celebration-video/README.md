@@ -26,3 +26,24 @@ photos. To fix the display names or the order, edit `manifest.json` (each `name`
 of the list).
 
 Check frames quickly: `python3 render.py stills 5 30 80 88` writes PNGs to `build/stills/`.
+
+## Second film: "Lighting the City of Excellence" (`EUREKA_10_GAHAR_CELEBRATION.mp4`)
+
+A procedural night city with ten landmark towers. A torch-like flame flies from tower to tower, each
+tower lights up, and the institution's real logo appears followed by photos from its own folder only.
+At the end the ten lights converge into a giant gold "10".
+
+| File | Purpose |
+|---|---|
+| `city_timeline.py` | Scene timings (0.55 s beat: every torch arrival lands on the music) |
+| `music_city.py` | Original score for this film (synthesised in code, royalty-free) |
+| `city_film.py` | City, camera, torch, milestone reveal component, finale |
+
+```bash
+python3 city_film.py world                                  # build the city layers once
+EUREKA_ASSETS=/path/to/assets python3 city_film.py stills 20 80
+EUREKA_ASSETS=/path/to/assets python3 city_film.py video    # -> EUREKA_10_GAHAR_CELEBRATION.mp4
+```
+
+Quick edits: names, branch labels, order and photos live in the assets folder's `manifest.json`;
+on-screen text is in `city_film.py` (search for the phrase), and timings are in `city_timeline.py`.
