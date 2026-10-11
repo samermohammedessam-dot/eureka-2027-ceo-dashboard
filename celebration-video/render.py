@@ -470,6 +470,18 @@ def name_card(name, w, h, radius=22, frame=4):
     return Layer(card, glow.filter(ImageFilter.GaussianBlur(18)))
 
 
+@functools.lru_cache(maxsize=None)
+def branch_tag(text):
+    """Small navy pill with a gold italic branch name, sitting on a logo card's bottom edge."""
+    f = font('playfair', 26, 600)
+    w, h, m = int(f.getlength(text)) + 40, 36, 6
+    img = Image.new('RGBA', (w + 2 * m, h + 2 * m), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle((m, m, m + w, m + h), h // 2, fill=(26, 43, 76, 255), outline=(222, 186, 104, 255), width=2)
+    d.text((m + w / 2, m + h / 2), text, font=f, fill=(240, 214, 140, 255), anchor='mm')
+    return Layer(img, None)
+
+
 def inst_card(inst, w, h, **kw):
     if inst['logo']:
         return plaque(inst['logo'], w, h, **kw)
@@ -804,9 +816,13 @@ def institution_slot(cv, t, i, inst):
     lines = fit_text_lines(inst['name'], 'cinzel', 50, 700, 720 if mv < 0.5 else 640, 3, 'gold', 8)
     q = seg(u, 0.4, 0.85)
     y = cy + 430 * sc / 2 + 62
-    for ln in lines:
-        composite(cv, ln, cx, y + 14 * (1 - ease_out(q)), 1.0, ease_io(q), glow=0.6)
-        y += ln.h * 0.62
+    if inst.get('branch'):  # same logo for several branches: italic branch name instead of the brand name
+        composite(cv, text_layer(inst['branch'], 'playfair', 54, 600, 0, 'gold', 8), cx,
+                  y + 4 + 14 * (1 - ease_out(q)), 1.0, ease_io(q), glow=0.6)
+    else:
+        for ln in lines:
+            composite(cv, ln, cx, y + 14 * (1 - ease_out(q)), 1.0, ease_io(q), glow=0.6)
+            y += ln.h * 0.62
     # exit: light streak sweeps across, hand-off flash
     add_light(cv, streak(seg(u, 3.6, 4.0), angle=-0.35 if i % 2 else -2.8), GOLD_HI, 1.0 * (u > 3.55))
     flash(cv, 0.6 * seg(u, 3.85, 4.0) ** 2)
@@ -1042,6 +1058,9 @@ def scene5(cv, t):
         y += 6 * math.sin(t * 1.6 + k)
         composite(cv, inst_card(inst, 300, 168, pad_frac=0.08, radius=16, frame=3), x, y,
                   0.5 + 0.5 * ease_back(q), seg(u, s, s + 0.12), glow=0.3 + 0.9 * math.exp(-(u - s) / 0.25))
+        if inst.get('branch'):
+            composite(cv, branch_tag(inst['branch']), x, y + 84,
+                      1.0, seg(u, s + 0.1, s + 0.35), glow=0.4)
         if u - s < 0.2:
             splat(cv, x, y - 95, 10, 0.8 * (1 - (u - s) / 0.2))
     flash(cv, 1.8 * math.exp(-u / 0.16))
