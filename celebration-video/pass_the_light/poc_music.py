@@ -28,7 +28,7 @@ def compose():
     for t, m in [(0.3, 66), (0.85, 69), (1.4, 74), (2.5, 73), (3.6, 71), (4.15, 74), (4.7, 78), (5.8, 76),
                  (6.9, 73), (7.45, 76), (8.0, 81), (9.1, 78)]:
         bell.add(t, piano(mf(m)), 0.30)
-    DOOR, CITY, ARRIVE = 2.6, 6.75, 10.95   # PASS THE LIGHT proof-of-concept cut points
+    DOOR, CITY, ARRIVE = (float(v) for v in os.environ.get('PTL_CUTS', '2.6,6.75,10.95').split(','))  # cut points
     t = DOOR
     while t < DUR - 0.3:  # pulse starts as the relay light opens the door
         n = [c for s_, c in PROG if s_ <= t + 1e-6][-1]
@@ -54,7 +54,8 @@ def compose():
 
 if __name__ == '__main__':
     out = sys.argv[1]
-    arc = ([0, 2.5, 2.6, 6.7, 6.75, 30], [-9, -8, -6, -4.5, -1.5, -1.5])
+    _d, _c, _a = (float(v) for v in os.environ.get('PTL_CUTS', '2.6,6.75,10.95').split(','))
+    arc = ([0, _d - 0.1, _d, _c - 0.05, _c, 30], [-9, -8, -6, -4.5, -1.5, -1.5])
     x = M.mix(*compose(), arc=arc)
     t = np.arange(N) / M.SR
     x *= np.clip((DUR - t) / 1.2, 0, 1)
