@@ -119,8 +119,8 @@ def title_block(cv, inst, k, x, y, q, scale=1.0, align_w=900):
     if o <= 0.01:
         return
     zx = np.exp(-((np.arange(W) - x) / (align_w * 0.62)) ** 4)
-    zy = np.exp(-((np.arange(H) - (y + 34 * scale)) / (95 * scale)) ** 4)
-    cv *= (1 - 0.5 * o * zy[:, None] * zx[None, :])[..., None]
+    zy = np.exp(-((np.arange(H) - (y + 60 * scale)) / (140 * scale)) ** 4)
+    cv *= (1 - 0.65 * o * zy[:, None] * zx[None, :])[..., None]
     yy = y
     for ln in R.fit_text_lines(name_of(inst), 'cinzel', int(60 * scale), 700, align_w, 3, 'ivory', 6):
         composite(cv, ln, x, yy + 10 * (1 - ease_out(q)), 1.0, o, glow=0.25)
@@ -307,58 +307,59 @@ def comp_wall(cv, t, k, inst, u):
 
 
 def comp_architect(cv, t, k, inst, u):
-    """V2 — Architectural logo reveal on a column of light, then a full-frame people moment."""
-    ph = inst['photos']
+    """V2 — Architectural logo reveal on a column of light, then the logo steps aside for the people.
+
+    Photos sit in framed boxes in their own right-hand column (no extreme close-ups, no text over faces)."""
+    ph = inst['photos'][:2]
     a = IGN + 0.1
-    full = ease_io(seg(u, 2.4, 3.1)) if ph else 0.0
+    full = ease_out(seg(u, 2.5, 3.2)) if ph else 0.0
+    mv = ease_io(seg(u, 2.2, 2.9)) if ph else 0.0
     if full > 0:
-        path = ph[0] if len(ph) < 3 else ph[2]
-        if R.is_portrait(path, 1.15):
-            w, h = R.contain(path, 1400, 1000)
-            kb_photo(cv, path, 1180, 540, w, h, seg(u, 2.4, 6.0), seed=k * 7, o=full, border=True)
-        else:
-            arr = R.photo_crop(path, W, H, seg(u, 2.4, 6.0), seed=k * 7, zoom=0.08)
-            grade = arr * 0.92 * R.vignette(0.55)
-            cv[:] = cv * (1 - full) + grade * full
-    mv = ease_io(seg(u, 2.3, 3.0))
-    x, y = lerp(W / 2, 440, mv), lerp(470, 720, mv)
-    s = lerp(1.05, 0.62, mv)
+        n = len(ph)
+        bw = 1140 // n - (30 if n > 1 else 0)
+        for j, path in enumerate(ph):
+            q = ease_out(seg(u, 2.5 + 0.25 * j, 3.2 + 0.25 * j))
+            w, h = photo_box(path, bw, 860)
+            cx = 1300 + (j - (n - 1) / 2) * (bw + 30)
+            kb_photo(cv, path, cx + 40 * (1 - q), 540, w, h, seg(u, 2.5, 6.0), seed=k * 7 + j, o=q)
+    x, y = lerp(W / 2, 370, mv), lerp(470, 330, mv)
+    s = lerp(1.05, 0.8, mv)
     glow(cv, x, y, 420, GOLD, 0.25 * (1 - mv) * seg(u, a, a + 0.6))
-    reveal_plate(cv, inst, x, y, u - a, s=s, seal_pos=(x + 470 * s + 30, y), seal_d=int(lerp(190, 150, mv)))
+    seal_pos = (lerp(x + 470 * s + 30, 370, mv), lerp(y, 600, mv))
+    reveal_plate(cv, inst, x, y, u - a, s=s, seal_pos=seal_pos, seal_d=int(lerp(190, 150, mv)))
     if mv < 0.5:
-        title_block(cv, inst, k, W / 2, 760, seg(u, a + 0.5, a + 1.1) * (1 - seg(u, 2.0, 2.4)), scale=0.95, align_w=1300)
+        title_block(cv, inst, k, W / 2, 760, seg(u, a + 0.5, a + 1.1) * (1 - seg(u, 2.0, 2.3)), scale=0.95, align_w=1300)
     else:
-        title_block(cv, inst, k, 470, 915, seg(u, 3.0, 3.5), scale=0.62, align_w=760)
+        title_block(cv, inst, k, 370, 730, seg(u, 2.8, 3.3), scale=0.85, align_w=640)
 
 
 def comp_mosaic(cv, t, k, inst, u):
-    """V3 — Elegant mosaic of the institution's photographs with a moving spotlight focus."""
+    """V3 — Logo, seal and title in a clean left column; a 2x2 mosaic of photographs on the right
+    with a moving spotlight focus."""
     ph = inst['photos'][:4]
     a = IGN + 0.15
     if ph:
-        tiles = [(0, 0), (1, 0), (0, 1), (1, 1)][:max(2, len(ph))]
-        tw, th = W // 2 - 30, H // 2 - 30
+        n = max(2, len(ph))
+        tiles = [(0, 0), (1, 0), (0, 1), (1, 1)][:n]
+        tw, th = 540, 420
         for j, (cx_, cy_) in enumerate(tiles):
             path = ph[j % len(ph)]
-            x = 30 + cx_ * (tw + 30) + tw / 2 - 15
-            y = 30 + cy_ * (th + 30) + th / 2 - 15
-            q = ease_out(seg(u, a + 0.2 * j, a + 0.7 + 0.2 * j))
+            x = 1030 + cx_ * (tw + 30)
+            y = (335 if n > 2 else 540) + cy_ * (th + 30)
+            q = ease_out(seg(u, a + 0.3 + 0.2 * j, a + 0.9 + 0.2 * j))
             focus = math.exp(-((u - (a + 1.4 + 1.0 * j)) / 0.8) ** 2)
             w, h = photo_box(path, tw, th)
-            kb_photo(cv, path, x, y, w, h, seg(u, a, 6), seed=k * 11 + j, o=q * (0.5 + 0.5 * focus))
-    # logo in a quiet centre zone, always on top
-    zx = np.exp(-((np.arange(W) - W / 2) / 560.0) ** 4)
-    zy = np.exp(-((np.arange(H) - 470) / 300.0) ** 4)
-    cv *= (1 - 0.6 * seg(u, a, a + 0.5) * zy[:, None] * zx[None, :])[..., None]
-    reveal_plate(cv, inst, W / 2 - 110, 420, u - a, s=0.78, seal_pos=(W / 2 + 290, 420), seal_d=150)
-    title_block(cv, inst, k, W / 2, 640, seg(u, a + 0.5, a + 1.1), scale=0.8, align_w=1100)
+            kb_photo(cv, path, x + 40 * (1 - q), y, w, h, seg(u, a, 6), seed=k * 11 + j, o=q * (0.6 + 0.4 * focus))
+            glow(cv, x, y, 260, WARM, 0.18 * focus * q)
+    reveal_plate(cv, inst, 380, 330, u - a, s=0.8, seal_pos=(380, 600), seal_d=150)
+    title_block(cv, inst, k, 380, 730, seg(u, a + 0.5, a + 1.1), scale=0.85, align_w=640)
 
 
 def comp_logo_only(cv, t, k, inst, u):
     """Logo-focused recognition (no photographs supplied): plate + seal under a crown of light."""
     a = IGN + 0.1
     R.DUST.draw(cv, t, 1.0)
-    ST.add(cv, R.rays(W / 2, 420, t, n=18, speed=0.05, reach=900), GOLD, 0.35 * seg(u, a, a + 0.6))
+    ST.add(cv, R.rays(W / 2, 420, t, n=18, speed=0.05, reach=900), GOLD, 0.25 * seg(u, a, a + 0.6))
     reveal_plate(cv, inst, W / 2 - 150, 420, u - a, s=1.05, seal_pos=(W / 2 + 390, 420), seal_d=230)
     title_block(cv, inst, k, W / 2, 720, seg(u, a + 0.5, a + 1.1), scale=1.0, align_w=1300)
 
@@ -395,7 +396,7 @@ def journey():
     items = []
     for j, p in enumerate(pool[:28]):
         side = -1 if j % 2 == 0 else 1
-        items.append((p, side * rng.uniform(380, 620), rng.uniform(-200, 160), 700 + j * 520, rng.uniform(-3, 3)))
+        items.append((p, side * rng.uniform(470, 680), rng.uniform(-120, 150), 900 + j * 690, rng.uniform(-3, 3)))
     return items
 
 
@@ -408,7 +409,7 @@ def s4_people(cv, t):
     visible = []
     for p, x, y, z, rot in journey():
         dz = z - camz
-        if 120 < dz < 3800:
+        if 380 < dz < 3800:  # photos retire before they become extreme close-ups
             visible.append((dz, p, x, y, rot))
     for dz, p, x, y, rot in sorted(visible, key=lambda v: -v[0]):
         s = f / dz
@@ -417,7 +418,7 @@ def s4_people(cv, t):
         if sw < 30:
             continue
         lay = framed(p, w0 // 2, h0 // 2)
-        fade = min(1.0, (3800 - dz) / 900) * min(1.0, (dz - 120) / 220)
+        fade = min(1.0, (3800 - dz) / 900) * min(1.0, (dz - 380) / 380)
         sx, sy = W / 2 + x * s, H / 2 + y * s
         composite(cv, lay, sx, sy, s * 2, fade, glow=0, rot=rot)
         if dz < 600:  # speed light as a photo passes the camera
@@ -428,8 +429,8 @@ def s4_people(cv, t):
         if a <= t < b:
             q = seg(t, a, a + 0.7) * (1 - seg(t, b - 0.4, b))
             zy = np.exp(-((np.arange(H) - 540) / 110.0) ** 4)
-            cv *= (1 - 0.55 * q * zy)[:, None, None]
-            composite(cv, text_layer(text, 'cinzel', 84, 700, 12, 'gold', 14), W / 2, 540 + 14 * (1 - ease_out(q)), 1.0, ease_io(q), glow=0.8)
+            cv *= (1 - 0.75 * q * zy)[:, None, None]
+            composite(cv, text_layer(text, 'cinzel', 84, 700, 12, 'gold', 14), W / 2, 540 + 14 * (1 - ease_out(q)), 1.0, ease_io(q), glow=0.45)
     if t > T_DROP - 0.5:
         cv *= 1 - seg(t, T_DROP - 0.5, T_DROP)
     return True
@@ -464,7 +465,7 @@ def ring_positions():
     pos = []
     for side in (-1, 1):
         for j in range(5):
-            pos.append((W / 2 + side * (690 + 55 * math.cos((j - 2) / 2 * 1.2)), 250 + j * 190))
+            pos.append((W / 2 + side * (690 + 55 * math.cos((j - 2) / 2 * 1.2)), 215 + j * 175))
     order = [0, 5, 1, 6, 2, 7, 3, 8, 4, 9]
     return [pos[o] for o in order]
 
