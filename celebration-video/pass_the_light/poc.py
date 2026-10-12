@@ -34,7 +34,7 @@ CLIP = None  # path of the Promoat clip (vertical); None -> stand-in
 LOGO_IN, LOGO_TO_CORNER = 0.4, 1.7
 DOOR_OPEN = (2.4, 3.3)
 CLIP_START = 3.3
-CLIP_LEN = 5.0
+CLIP_LEN = 3.0  # Promoat C2 is 1.5 s -> shown as smooth 0.5x slow motion
 WIDEN = (CLIP_START + CLIP_LEN - 1.2, CLIP_START + CLIP_LEN + 0.2)
 CITY = (CLIP_START + CLIP_LEN + 0.2, DUR)
 
@@ -139,7 +139,7 @@ def clip_frame(u):
 def clip_frames():
     tmp = os.path.join(BUILD, 'clip_frames')
     os.makedirs(tmp, exist_ok=True)
-    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', CLIP, '-vf', f'fps={FPS},scale=1080:1920', os.path.join(tmp, 'f%04d.jpg')], check=True)
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-i', CLIP, '-vf', f'minterpolate=fps=60:mi_mode=mci:mc_mode=aobmc:vsbmc=1,setpts=2.0*PTS,fps={FPS},scale=1080:1920', os.path.join(tmp, 'f%04d.jpg')], check=True)
     return [Image.open(os.path.join(tmp, f)).convert('RGB') for f in sorted(os.listdir(tmp))]
 
 
@@ -165,7 +165,7 @@ def door(cv, t):
         cw_, ch_ = fh * ar, fh
     else:
         cw_, ch_ = fw, fw / ar
-    fy = fh * lerp(0.5, 0.42, widen)  # keep the face in the upper-middle of the widescreen crop
+    fy = fh * lerp(0.5, 0.36, widen)  # keep the face in the upper-middle of the widescreen crop
     box = (fw / 2 - cw_ / 2, max(0, min(fh - ch_, fy - ch_ / 2)), fw / 2 + cw_ / 2, 0)
     box = (box[0], box[1], box[2], box[1] + ch_)
     img = frame.resize((iw, ih), Image.BICUBIC, box=box)
@@ -313,9 +313,9 @@ def render_video(out):
     inputs = ['-i', silent, '-i', music]
     if CLIP:  # actor's dialogue, placed when the door clip plays; music ducks under it
         inputs += ['-i', CLIP]
-        filt = (f'[2:a]adelay={int(CLIP_START * 1000)}|{int(CLIP_START * 1000)},apad[d];'
-                f'[1:a][d]sidechaincompress=threshold=0.03:ratio=6:attack=20:release=400[m];'
-                f'[m][d]amix=inputs=2:normalize=0,alimiter=limit=0.95[a]')
+        filt = (f'[2:a]aresample=48000,aformat=channel_layouts=stereo,volume=1.6,adelay={int((CLIP_START + 0.7) * 1000)}|{int((CLIP_START + 0.7) * 1000)},apad,asplit=2[d1][d2];'
+                f'[1:a][d1]sidechaincompress=threshold=0.03:ratio=6:attack=20:release=400[m];'
+                f'[m][d2]amix=inputs=2:normalize=0,alimiter=limit=0.95[a]')
         amap = ['-filter_complex', filt, '-map', '0:v', '-map', '[a]']
     else:
         amap = ['-map', '0:v', '-map', '1:a']
