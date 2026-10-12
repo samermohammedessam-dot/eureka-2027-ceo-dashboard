@@ -404,7 +404,7 @@ def mix(buses, post, arc=None):
     out += np.stack([post.L, post.R]) * 0.5
     out = np.tanh(out * 1.6) / np.tanh(1.6)
     # final fade
-    fade = np.clip((90 - t) / 1.8, 0, 1) ** 1.5
+    fade = np.clip((N / SR - t) / 1.8, 0, 1) ** 1.5  # fade over the film's own last 1.8 s
     out *= fade
     out *= 0.89 / np.abs(out).max()
     return out
