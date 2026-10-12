@@ -20,11 +20,11 @@
   "character_id": "76a49a90-9ca9-4a61-a6ff-5f999569915e",
   "voice_mode": "none",
   "target_seconds": 10,
-  "video_idea": "one man, senior physician in a white doctor's coat over a light blue shirt, closes a clinical folder at a desk, rises, hands the folder forward toward the camera, then walks naturally down a bright modern hospital corridor; the same man throughout; no other people; do not restyle or recast the presenter",
+  "video_idea": "one man, senior physician in a white doctor's coat over a light blue shirt; first he finishes reviewing a clinical document at a desk, closes the folder and stands up naturally with confidence; then he walks confidently through a modern hospital corridor holding the folder; natural body movement, realistic proportions, premium cinematic lighting; the same man throughout; no other people; do not restyle or recast the presenter",
   "scene_prompt": "modern Egyptian hospital, early morning golden light, clean premium interiors, cinematic camera movement, shallow depth of field",
   "scene_lines": [
-   "The senior physician closes the clinical folder with quiet satisfaction and rises from the desk, morning light behind him.",
-   "He hands the folder forward toward the camera with a confident nod, then turns and walks naturally down the bright hospital corridor, camera tracking him."
+   "Shot A: he finishes reviewing a clinical document at his desk, closes the folder with a natural, believable gesture and stands up with quiet confidence; warm morning light, subtle slow cinematic push-in.",
+   "Shot B: he walks confidently through a bright modern hospital corridor holding the folder at his side, natural walking motion and realistic body proportions, the camera smoothly tracking alongside him; premium cinematic lighting."
   ]
  },
  "C4_safety_check": {

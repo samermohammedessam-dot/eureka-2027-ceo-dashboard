@@ -72,7 +72,7 @@ def eureka_layer(width):
     halo.paste(a, (m, m))
     halo = halo.filter(ImageFilter.GaussianBlur(width * 0.07))
     glow = Image.new('RGBA', canvas.size, (250, 244, 228, 0))
-    glow.putalpha(halo.point(lambda v: int(min(255, v * (0.45 if width > 300 else 1.6)))))
+    glow.putalpha(halo.point(lambda v: int(min(255, v * (0.45 if width > 300 else 1.15)))))
     canvas.alpha_composite(glow)
     canvas.alpha_composite(lg, (m, m))
     return Layer(canvas, None)
@@ -231,6 +231,13 @@ def city(cv, t):
     img, _ = S.render_city(cam, [lvl] + [0.0] * 9, sweeps=[sweep] + [1.0] * 9)
     cv[:] = img
     # horizon haze glow
+    for ax_, ay_, az_, ph_ in S.AVIATION:  # blinking red aviation lights
+        sp, zz = cam.screen((ax_, ay_, az_))
+        if 5 < zz < 7000 and 0 <= sp[0] < W and 0 <= sp[1] < H:
+            on = 0.5 + 0.5 * math.sin(t * 3.0 + ph_)
+            cv[int(sp[1]), int(sp[0])] += np.array([1.0, 0.15, 0.1]) * 2.0 * on
+            if zz < 2500:
+                add_light(cv, radial(sp[0], sp[1], 12), np.array([1.0, 0.2, 0.12]), 0.25 * on)
     # the relay comet with a ribbon trail and the light path it leaves behind
     qn = ease_io(seg(t, T_CITY + 0.4, T_ARRIVE))
     pts = []
@@ -271,24 +278,24 @@ def milestone_card(cv, t, anchor):
     inst = R.manifest()['institutions'][0]
     q = ease_out(min(1.0, arr / 0.5))
     ax, ay = anchor
-    cx, cy = min(W - 380, ax + 470), max(330, min(H - 330, ay + 170))
+    cx, cy = min(W - 400, ax + 520), max(360, min(H - 300, ay + 200))
     # leader line from tower crown to the card
     m = Image.new('L', (R.LW, R.LH), 0)
     ImageDraw.Draw(m).line([(ax / 4, ay / 4), ((cx - 300) / 4, cy / 4)], fill=int(200 * q), width=1)
     add_light(cv, np.asarray(m.filter(ImageFilter.GaussianBlur(0.6)), np.float32) / 255, GOLD_HI, 0.7)
     # frosted glass panel
-    pw, ph = 600, 420
+    pw, ph = 700, 520
     x0, y0 = int(cx - pw / 2), int(cy - ph / 2 + 30 * (1 - q))
     r = R.region(x0, y0, pw, ph)
     if r:
         cv[r[0]] = cv[r[0]] * (1 - 0.55 * q) + np.array([0.05, 0.08, 0.17]) * 0.55 * q
         cv[r[0]][:2] += GOLD_HI * 0.6 * q
-    seal = R.seal_layer(92)
-    composite(cv, seal, cx, y0 + 70, 0.7 + 0.3 * ease_out(q), q, glow=0.4)
-    composite(cv, R.inst_card(inst, 440, 230), cx, y0 + 215, 0.8 + 0.2 * ease_out(q), q, glow=0.25)
+    seal = R.seal_layer(128)
+    composite(cv, seal, cx, y0 + 82, 0.7 + 0.3 * ease_out(q), q, glow=0.4)
+    composite(cv, R.inst_card(inst, 600, 300), cx, y0 + 292, 0.8 + 0.2 * ease_out(q), q, glow=0.25)
     if inst.get('branch'):
-        composite(cv, text_layer(inst['branch'], 'playfair', 38, 600, 0, 'gold', 6), cx, y0 + 352, 1.0, q, glow=0.4)
-    composite(cv, text_layer('GAHAR ACCREDITATION  ·  MILESTONE 01', 'mont', 19, 600, 5, 'gold', 3), cx, y0 + 395, 1.0, q, glow=0.3)
+        composite(cv, text_layer(inst['branch'], 'playfair', 40, 600, 0, 'gold', 6), cx, y0 + 455, 1.0, q, glow=0.4)
+    composite(cv, text_layer('GAHAR ACCREDITATION  ·  MILESTONE 01', 'mont', 21, 600, 5, 'gold', 3), cx, y0 + 498, 1.0, q, glow=0.3)
 
 
 def frame(t):
@@ -299,10 +306,10 @@ def frame(t):
         cv *= ease_io(seg(t, 0.0, 0.9)) * (0.5 + 0.5 * seg(t, T_CORNER[0], T_DOOR[0]))
         relay_corridor(cv, t, cam)
         doorway(cv, t, cam)
-        flash(cv, 1.3 * seg(t, T_CITY - 0.25, T_CITY) ** 2)
+        add_light(cv, radial(W / 2, H / 2, 900) * 0.7 + 0.3, np.array([1.0, 0.78, 0.45]), 0.35 * seg(t, T_CITY - 0.35, T_CITY) ** 2)
     else:
         ccam, anchor = city(cv, t)
-        flash(cv, 1.1 * math.exp(-(t - T_CITY) / 0.25))
+        add_light(cv, radial(W / 2, H / 2, 900) * 0.7 + 0.3, np.array([1.0, 0.78, 0.45]), 0.3 * math.exp(-(t - T_CITY) / 0.3))
         tq = seg(t, T_CITY + 0.8, T_CITY + 1.6)
         composite(cv, text_layer('EXCELLENCE IS NEVER ACHIEVED ALONE.', 'cinzel', 50, 700, 5, 'gold', 10), W / 2, 905,
                   lerp(1.05, 1.0, ease_out(tq)), ease_io(tq) * (1 - seg(t, T_ARRIVE - 0.3, T_ARRIVE + 0.2)), glow=0.8)

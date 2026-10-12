@@ -84,7 +84,7 @@ def fogged(col, depth, fog_col, fog_dist):
 class Prism:
     """Footprint polygon (counter-clockwise, x/z) extruded from y0 to y1."""
 
-    def __init__(self, foot, y0, y1, base_col, rng, win=True, win_dx=16, win_dy=20, lit_p=0.22, landmark=-1):
+    def __init__(self, foot, y0, y1, base_col, rng, win=True, win_dx=16, win_dy=20, lit_p=0.22, landmark=-1, bands=False):
         self.foot = np.asarray(foot, np.float64)
         self.y0, self.y1 = y0, y1
         self.col = base_col
@@ -106,6 +106,9 @@ class Prism:
                 uu, vv = uu.ravel(), vv.ravel()
                 pts = np.stack([a[0] + edge[0] / L * uu, vv, a[1] + edge[1] / L * uu], -1) + nrm * 0.6
                 r = rng.random(len(pts))
+                if bands:  # glass towers: whole floors lit, reading as horizontal light bands
+                    rows = np.round((vv - y0) / win_dy).astype(int)
+                    r = rng.random(rows.max() + 1)[rows] * 0.92 + r * 0.08
                 bright = rng.uniform(0.45, 1.0, len(pts))
                 hfrac = (vv - y0) / max(1, y1 - y0)
                 wins = (pts, r, bright, hfrac)
@@ -200,6 +203,7 @@ def draw_windows(draw, win_points, cam, env):
 
 # ------------------------------------------------------------------ the City of Excellence
 LANDMARK_N = 10
+AVIATION = []  # (x, y, z, phase) red blinking lights on spires
 
 
 @functools.lru_cache(maxsize=1)
@@ -260,10 +264,38 @@ def city():
                 if rng.random() < 0.035 and near > 700:  # occasional distant high-rise
                     h = rng.uniform(330, 520)
                     sx, sz = rng.uniform(35, 55), rng.uniform(35, 55)
+                mat = rng.choice(['glass', 'stone', 'plain'], p=[0.3, 0.2, 0.5])
                 shade = rng.uniform(0.75, 1.05)
-                col = (int(16 * shade), int(26 * shade), int(50 * shade))
+                if mat == 'glass':
+                    col = (int(12 * shade), int(30 * shade), int(64 * shade))
+                elif mat == 'stone':
+                    col = (int(36 * shade), int(32 * shade), int(42 * shade))
+                else:
+                    col = (int(16 * shade), int(26 * shade), int(50 * shade))
                 x0, x1, z0, z1 = cx + ox - sx, cx + ox + sx, cz + oz - sz, cz + oz + sz
-                prisms.append(Prism([(x1, z0), (x1, z1), (x0, z1), (x0, z0)], 0, h, col, rng))
+                if h > 240 and rng.random() < 0.25:  # octagonal tower
+                    r_ = min(sx, sz)
+                    foot = [(cx + ox + r_ * math.cos(a_), cz + oz + r_ * math.sin(a_)) for a_ in np.linspace(0, 2 * math.pi, 9)[:-1]]
+                    prisms.append(Prism(foot, 0, h, col, rng, win_dx=14, bands=(mat == 'glass')))
+                elif h > 200 and rng.random() < 0.4:  # setback tower
+                    prisms.append(Prism([(x1, z0), (x1, z1), (x0, z1), (x0, z0)], 0, h * 0.7, col, rng, bands=(mat == 'glass')))
+                    k_ = 0.62
+                    mx, mz = cx + ox, cz + oz
+                    prisms.append(Prism([(mx + sx * k_, mz - sz * k_), (mx + sx * k_, mz + sz * k_), (mx - sx * k_, mz + sz * k_),
+                                         (mx - sx * k_, mz - sz * k_)], h * 0.7, h, col, rng, bands=(mat == 'glass')))
+                else:
+                    prisms.append(Prism([(x1, z0), (x1, z1), (x0, z1), (x0, z0)], 0, h, col, rng, bands=(mat == 'glass')))
+                if rng.random() < 0.35:  # rooftop plant room
+                    rx, rz = cx + ox + rng.uniform(-sx, sx) * 0.4, cz + oz + rng.uniform(-sz, sz) * 0.4
+                    rs = rng.uniform(10, 22)
+                    prisms.append(Prism([(rx + rs, rz - rs), (rx + rs, rz + rs), (rx - rs, rz + rs), (rx - rs, rz - rs)], h,
+                                        h + rng.uniform(8, 22), tuple(int(c_ * 0.8) for c_ in col), rng, win=False))
+                if h > 260 and rng.random() < 0.6:  # spire + aviation light
+                    mx, mz = cx + ox, cz + oz
+                    top = h + rng.uniform(50, 120)
+                    prisms.append(Prism([(mx + 3, mz - 3), (mx + 3, mz + 3), (mx - 3, mz + 3), (mx - 3, mz - 3)], h, top,
+                                        (40, 46, 70), rng, win=False))
+                    AVIATION.append((mx, top + 3, mz, rng.uniform(0, 6.28)))
     return prisms, land_info, route
 
 

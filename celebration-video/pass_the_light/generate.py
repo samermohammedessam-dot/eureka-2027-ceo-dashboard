@@ -44,7 +44,8 @@ def main(key, cap, resolution='1080P'):
         sys.exit(f"FAILED: {st.get('error_code')} {st.get('error_message')} (refunded automatically)")
     os.makedirs(os.path.join(HERE, 'clips'), exist_ok=True)
     out = os.path.join(HERE, 'clips', f'{key}.mp4')
-    urllib.request.urlretrieve(st['video_url'], out)
+    import subprocess  # the file host rejects Python's default user agent (403): use curl
+    subprocess.run(['curl', '-sS', '-L', '-m', '600', '-o', out, st['video_url']], check=True)
     print('downloaded', out, '| credits consumed', st.get('credits_consumed'))
 
 
