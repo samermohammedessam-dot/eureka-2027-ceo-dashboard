@@ -1,0 +1,40 @@
+{
+ "A_amira_dialogue": {
+  "mode": "talking_head",
+  "character_id": "398790b9-47b6-4dfb-bcbf-3e096cce0d2a",
+  "voice_id": "sv_sarah_a8ad954b18f5",
+  "script": "Can we really achieve this? ... We did it.",
+  "video_idea": "one woman, the same woman throughout, healthcare quality specialist in a white blouse and grey blazer with hospital lanyard, sitting at a desk in a modern hospital quality office at early morning, soft window light, a large improvement plan document on the desk, looks up with a thoughtful, slightly worried expression; cinematic, shallow depth of field; no other people"
+ },
+ "B_karim_dialogue": {
+  "mode": "talking_head",
+  "character_id": "76a49a90-9ca9-4a61-a6ff-5f999569915e",
+  "voice_id": "sv_george_f6e6a49606b1",
+  "script": "Not alone. ... But together? Absolutely. ... Together.",
+  "video_idea": "one man, the same man throughout, senior physician in a white doctor's coat over a light blue shirt, standing in the doorway of a modern hospital office at early morning, warm soft light, gentle reassuring smile; cinematic, shallow depth of field; no other people"
+ },
+ "E_karim_folder": {
+  "mode": "scenes",
+  "character_id": "76a49a90-9ca9-4a61-a6ff-5f999569915e",
+  "voice_mode": "none",
+  "target_seconds": 10,
+  "video_idea": "one man, the same man throughout, senior physician in a white doctor's coat, closes a clinical review folder at a nurses' station, then turns and hands the folder forward toward the camera, then walks confidently down a bright modern hospital corridor; no other people; do not restyle or recast the presenter",
+  "scene_prompt": "modern Egyptian hospital, clean corridors, warm morning light, cinematic tracking shot"
+ },
+ "F_nour_safety": {
+  "mode": "scenes",
+  "character_id": "be9c29a6-3e43-475d-bfff-c66affa704b5",
+  "voice_mode": "none",
+  "target_seconds": 10,
+  "video_idea": "one woman, the same woman throughout, registered nurse in light-blue scrubs, prepares a patient room: smooths the bed linen, checks the IV pump, then ticks a patient-safety checklist on a clipboard with a calm smile; no other people; do not restyle or recast the presenter",
+  "scene_prompt": "bright modern hospital patient room, soft daylight, cinematic slow dolly"
+ },
+ "G_amira_training": {
+  "mode": "scenes",
+  "character_id": "398790b9-47b6-4dfb-bcbf-3e096cce0d2a",
+  "voice_mode": "none",
+  "target_seconds": 10,
+  "video_idea": "one woman, the same woman throughout, healthcare quality specialist in a grey blazer, presents an improvement plan on a large screen in a hospital training room, gestures to a chart, then walks along a hospital corridor holding the plan with determination; no other people; do not restyle or recast the presenter",
+  "scene_prompt": "modern hospital training room and corridor, morning light, cinematic steadicam"
+ }
+}
