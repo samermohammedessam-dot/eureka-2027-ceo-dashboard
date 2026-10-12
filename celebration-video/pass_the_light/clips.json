@@ -20,8 +20,12 @@
   "character_id": "76a49a90-9ca9-4a61-a6ff-5f999569915e",
   "voice_mode": "none",
   "target_seconds": 10,
-  "video_idea": "one man, senior physician in a white doctor's coat, reviews a clinical file at a desk, closes the folder with satisfaction, stands and hands the folder forward toward the camera, then walks down a hospital corridor; the same man throughout; no other people; do not restyle or recast the presenter",
-  "scene_prompt": "modern Egyptian hospital, early morning golden light, clean premium interiors, cinematic camera movement, shallow depth of field"
+  "video_idea": "one man, senior physician in a white doctor's coat over a light blue shirt, closes a clinical folder at a desk, rises, hands the folder forward toward the camera, then walks naturally down a bright modern hospital corridor; the same man throughout; no other people; do not restyle or recast the presenter",
+  "scene_prompt": "modern Egyptian hospital, early morning golden light, clean premium interiors, cinematic camera movement, shallow depth of field",
+  "scene_lines": [
+   "The senior physician closes the clinical folder with quiet satisfaction and rises from the desk, morning light behind him.",
+   "He hands the folder forward toward the camera with a confident nod, then turns and walks naturally down the bright hospital corridor, camera tracking him."
+  ]
  },
  "C4_safety_check": {
   "mode": "scenes",
@@ -45,14 +49,6 @@
   "voice_mode": "none",
   "target_seconds": 5,
   "video_idea": "one woman, healthcare quality specialist in a grey blazer, walks confidently down a long bright hospital corridor away from camera and pushes open a glass double door into brilliant warm light; the same woman throughout; no other people; do not restyle or recast the presenter",
-  "scene_prompt": "modern Egyptian hospital, early morning golden light, clean premium interiors, cinematic camera movement, shallow depth of field"
- },
- "C7_celebration_walk": {
-  "mode": "scenes",
-  "character_id": "76a49a90-9ca9-4a61-a6ff-5f999569915e",
-  "voice_mode": "none",
-  "target_seconds": 5,
-  "video_idea": "one man, senior physician in a white doctor's coat, walks through a hospital lobby smiling proudly, gives a small celebratory nod and applauds toward the camera; the same man throughout; no other people; do not restyle or recast the presenter",
   "scene_prompt": "modern Egyptian hospital, early morning golden light, clean premium interiors, cinematic camera movement, shallow depth of field"
  }
 }
