@@ -21,6 +21,8 @@ def compose():
     pad, strs, bell, perc, fx, low = (Bus(n) for n in ['pad', 'str', 'bell', 'perc', 'fx', 'low'])
     post = Bus('post')
     for t, n in PROG:
+        if t >= DUR - 0.05:
+            continue
         d = min(2.2, DUR - t)
         for j, m in enumerate(CH[n] + [CH[n][1] + 12]):
             pad.add(t, strings_pad(mf(m + 12), d, 1600 + 160 * t), 0.07, pan=(j - 1.5) * 0.35)

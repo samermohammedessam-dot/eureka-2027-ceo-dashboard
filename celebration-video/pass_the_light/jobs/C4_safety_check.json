@@ -1,0 +1,11 @@
+{
+ "C4_safety_check": {
+  "workflow_id": "partner_h3v_966e80dd56f9d6e3c2a1d1b4195ec02e",
+  "idempotency_key": "ptl-C4_safety_check-1791810816",
+  "quoted": 164,
+  "status": "completed",
+  "credits_consumed": 164,
+  "video_url": "https://pub-69e7ff4e5e7741d78df6928bffdd75ee.r2.dev/partner/466a36b3-adde-4d38-933b-43066704c9d5/videos/2026-10-12/partner_h3v_966e80dd56f9d6e3c2a1d1b4195ec02e/video.mp4",
+  "error_code": null
+ }
+}

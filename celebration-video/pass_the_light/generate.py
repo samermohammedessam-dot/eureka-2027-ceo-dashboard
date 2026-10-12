@@ -22,7 +22,8 @@ def main(key, cap, resolution='1080P'):
         sys.exit(f'STOP: quote {need} is missing or above the approved {cap} credits — nothing spent.')
     if not q.get('sufficient_credits'):
         sys.exit('STOP: insufficient credits — nothing spent.')
-    jobs_file = os.path.join(HERE, 'jobs.json')
+    jobs_file = os.path.join(HERE, 'jobs', f'{key}.json')  # one file per clip: safe for parallel runs
+    os.makedirs(os.path.dirname(jobs_file), exist_ok=True)
     jobs = json.load(open(jobs_file)) if os.path.exists(jobs_file) else {}
     idem = jobs.get(key, {}).get('idempotency_key') or f'ptl-{key}-{int(time.time())}'
     r = P.call('POST', '/videos', {**body, 'expected_credits': need}, idem=idem)

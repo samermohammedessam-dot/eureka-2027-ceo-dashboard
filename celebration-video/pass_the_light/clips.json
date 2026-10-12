@@ -2,10 +2,13 @@
  "C1_ready": {
   "mode": "scenes",
   "character_id": "398790b9-47b6-4dfb-bcbf-3e096cce0d2a",
-  "voice_id": "sv_sarah_a8ad954b18f5",
-  "script": "Ready? ... ... ...",
-  "video_idea": "one woman, healthcare quality specialist in a grey blazer with hospital lanyard, walks into a bright hospital corridor holding a folder, stops, turns her head toward the camera and asks warmly 'Ready?'; the same woman throughout; no other people; do not restyle or recast the presenter",
-  "scene_prompt": "modern Egyptian hospital, early morning golden light, clean premium interiors, cinematic camera movement, shallow depth of field"
+  "voice_mode": "none",
+  "target_seconds": 5,
+  "video_idea": "one woman, healthcare quality specialist in a navy hijab and grey blazer with hospital lanyard, in a bright quality office at early morning, picks up an improvement-plan binder from her desk, then looks up toward a colleague off-camera with a determined, warm smile; the same woman throughout; no other people visible; do not restyle or recast the presenter",
+  "scene_lines": [
+   "She picks up the improvement-plan binder from her desk and looks up toward a colleague off-camera with a determined, warm smile; morning light through the window, slow cinematic dolly-in, medium shot."
+  ],
+  "scene_prompt": "modern Egyptian hospital, premium natural lighting, realistic, cinematic, medium shots, no extreme close-ups"
  },
  "C2_lets_make_it_happen": {
   "mode": "scenes",
@@ -32,23 +35,34 @@
   "character_id": "be9c29a6-3e43-475d-bfff-c66affa704b5",
   "voice_mode": "none",
   "target_seconds": 10,
-  "video_idea": "one woman, registered nurse in light-blue scrubs, checks an IV pump and a patient wristband scanner in a patient room, then ticks a patient-safety checklist on a clipboard with a calm smile; the same woman throughout; no other people; do not restyle or recast the presenter",
-  "scene_prompt": "modern Egyptian hospital, early morning golden light, clean premium interiors, cinematic camera movement, shallow depth of field"
+  "video_idea": "one woman, registered nurse in light-blue scrubs and white hijab with hospital badge; first she checks the IV pump settings and the bedside monitor in a bright patient room, then she ticks a patient-safety checklist on a tablet at the nurses' station with a calm smile; the same woman throughout; no other people visible; do not restyle or recast the presenter",
+  "scene_lines": [
+   "Shot A: in a bright, empty patient room she checks the IV pump settings and the bedside monitor with focused care; soft daylight, slow lateral camera move, medium shot.",
+   "Shot B: at a modern nurses' station she ticks a patient-safety checklist on a tablet and gives a calm, confident smile; warm light, gentle camera push-in, medium shot."
+  ],
+  "scene_prompt": "modern Egyptian hospital, premium natural lighting, realistic, cinematic, medium shots, no extreme close-ups"
  },
  "C5_assessment_plan": {
   "mode": "scenes",
   "character_id": "398790b9-47b6-4dfb-bcbf-3e096cce0d2a",
   "voice_mode": "none",
   "target_seconds": 10,
-  "video_idea": "one woman, healthcare quality specialist in a grey blazer, prepares an assessment with highlighted documents, then explains an improvement plan pointing at a chart on a large screen in a hospital meeting room; the same woman throughout; no other people; do not restyle or recast the presenter",
-  "scene_prompt": "modern Egyptian hospital, early morning golden light, clean premium interiors, cinematic camera movement, shallow depth of field"
+  "video_idea": "one woman, healthcare quality specialist in a navy hijab and grey blazer; first she arranges assessment documents and highlights a checklist at a meeting table, then she stands beside a large screen presenting an improvement chart with confident gestures toward an off-screen audience; the same woman throughout; no other people visible; do not restyle or recast the presenter",
+  "scene_lines": [
+   "Shot A: at a bright meeting-room table she arranges assessment documents and highlights a checklist with care; natural window light, slow overhead-to-eye-level camera move, medium shot.",
+   "Shot B: she stands beside a large wall screen showing an improvement chart and presents with confident open gestures toward an off-screen audience; slow cinematic arc around her, medium shot."
+  ],
+  "scene_prompt": "modern Egyptian hospital, premium natural lighting, realistic, cinematic, medium shots, no extreme close-ups"
  },
  "C6_door_walk": {
   "mode": "scenes",
   "character_id": "398790b9-47b6-4dfb-bcbf-3e096cce0d2a",
   "voice_mode": "none",
   "target_seconds": 5,
-  "video_idea": "one woman, healthcare quality specialist in a grey blazer, walks confidently down a long bright hospital corridor away from camera and pushes open a glass double door into brilliant warm light; the same woman throughout; no other people; do not restyle or recast the presenter",
-  "scene_prompt": "modern Egyptian hospital, early morning golden light, clean premium interiors, cinematic camera movement, shallow depth of field"
+  "video_idea": "one woman, healthcare quality specialist in a navy hijab and grey blazer, walks confidently through a sunlit modern hospital atrium toward tall glass entrance doors and pushes them open into brilliant warm daylight; the camera follows from behind at medium distance; the same woman throughout; no other people visible; do not restyle or recast the presenter",
+  "scene_lines": [
+   "She walks confidently through a sunlit modern hospital atrium toward tall glass doors and pushes them open into brilliant warm daylight; the camera follows smoothly from behind at medium distance."
+  ],
+  "scene_prompt": "modern Egyptian hospital atrium, golden-hour sunlight, glass architecture, realistic, cinematic tracking shot"
  }
 }

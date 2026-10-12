@@ -1,0 +1,11 @@
+{
+ "C6_door_walk": {
+  "workflow_id": "partner_h3v_f011ca9c324dfccf58054c33f1ebd387",
+  "idempotency_key": "ptl-C6_door_walk-1791810816",
+  "quoted": 84,
+  "status": "completed",
+  "credits_consumed": 84,
+  "video_url": "https://pub-69e7ff4e5e7741d78df6928bffdd75ee.r2.dev/partner/466a36b3-adde-4d38-933b-43066704c9d5/videos/2026-10-12/partner_h3v_f011ca9c324dfccf58054c33f1ebd387/video.mp4",
+  "error_code": null
+ }
+}
