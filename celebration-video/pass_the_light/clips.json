@@ -1,40 +1,58 @@
 {
- "A_amira_dialogue": {
-  "mode": "talking_head",
+ "C1_ready": {
+  "mode": "scenes",
   "character_id": "398790b9-47b6-4dfb-bcbf-3e096cce0d2a",
   "voice_id": "sv_sarah_a8ad954b18f5",
-  "script": "Can we really achieve this? ... We did it.",
-  "video_idea": "one woman, the same woman throughout, healthcare quality specialist in a white blouse and grey blazer with hospital lanyard, sitting at a desk in a modern hospital quality office at early morning, soft window light, a large improvement plan document on the desk, looks up with a thoughtful, slightly worried expression; cinematic, shallow depth of field; no other people"
+  "script": "Ready? ... ... ...",
+  "video_idea": "one woman, healthcare quality specialist in a grey blazer with hospital lanyard, walks into a bright hospital corridor holding a folder, stops, turns her head toward the camera and asks warmly 'Ready?'; the same woman throughout; no other people; do not restyle or recast the presenter",
+  "scene_prompt": "modern Egyptian hospital, early morning golden light, clean premium interiors, cinematic camera movement, shallow depth of field"
  },
- "B_karim_dialogue": {
-  "mode": "talking_head",
+ "C2_lets_make_it_happen": {
+  "mode": "scenes",
   "character_id": "76a49a90-9ca9-4a61-a6ff-5f999569915e",
   "voice_id": "sv_george_f6e6a49606b1",
-  "script": "Not alone. ... But together? Absolutely. ... Together.",
-  "video_idea": "one man, the same man throughout, senior physician in a white doctor's coat over a light blue shirt, standing in the doorway of a modern hospital office at early morning, warm soft light, gentle reassuring smile; cinematic, shallow depth of field; no other people"
+  "script": "Let's make it happen.",
+  "video_idea": "one man, senior physician in a white doctor's coat, preparing documents at a nurses' station, looks up, smiles with confidence and says 'Let's make it happen', then starts walking forward; the same man throughout; no other people; do not restyle or recast the presenter",
+  "scene_prompt": "modern Egyptian hospital, early morning golden light, clean premium interiors, cinematic camera movement, shallow depth of field"
  },
- "E_karim_folder": {
+ "C3_file_pass": {
   "mode": "scenes",
   "character_id": "76a49a90-9ca9-4a61-a6ff-5f999569915e",
   "voice_mode": "none",
   "target_seconds": 10,
-  "video_idea": "one man, the same man throughout, senior physician in a white doctor's coat, closes a clinical review folder at a nurses' station, then turns and hands the folder forward toward the camera, then walks confidently down a bright modern hospital corridor; no other people; do not restyle or recast the presenter",
-  "scene_prompt": "modern Egyptian hospital, clean corridors, warm morning light, cinematic tracking shot"
+  "video_idea": "one man, senior physician in a white doctor's coat, reviews a clinical file at a desk, closes the folder with satisfaction, stands and hands the folder forward toward the camera, then walks down a hospital corridor; the same man throughout; no other people; do not restyle or recast the presenter",
+  "scene_prompt": "modern Egyptian hospital, early morning golden light, clean premium interiors, cinematic camera movement, shallow depth of field"
  },
- "F_nour_safety": {
+ "C4_safety_check": {
   "mode": "scenes",
   "character_id": "be9c29a6-3e43-475d-bfff-c66affa704b5",
   "voice_mode": "none",
   "target_seconds": 10,
-  "video_idea": "one woman, the same woman throughout, registered nurse in light-blue scrubs, prepares a patient room: smooths the bed linen, checks the IV pump, then ticks a patient-safety checklist on a clipboard with a calm smile; no other people; do not restyle or recast the presenter",
-  "scene_prompt": "bright modern hospital patient room, soft daylight, cinematic slow dolly"
+  "video_idea": "one woman, registered nurse in light-blue scrubs, checks an IV pump and a patient wristband scanner in a patient room, then ticks a patient-safety checklist on a clipboard with a calm smile; the same woman throughout; no other people; do not restyle or recast the presenter",
+  "scene_prompt": "modern Egyptian hospital, early morning golden light, clean premium interiors, cinematic camera movement, shallow depth of field"
  },
- "G_amira_training": {
+ "C5_assessment_plan": {
   "mode": "scenes",
   "character_id": "398790b9-47b6-4dfb-bcbf-3e096cce0d2a",
   "voice_mode": "none",
   "target_seconds": 10,
-  "video_idea": "one woman, the same woman throughout, healthcare quality specialist in a grey blazer, presents an improvement plan on a large screen in a hospital training room, gestures to a chart, then walks along a hospital corridor holding the plan with determination; no other people; do not restyle or recast the presenter",
-  "scene_prompt": "modern hospital training room and corridor, morning light, cinematic steadicam"
+  "video_idea": "one woman, healthcare quality specialist in a grey blazer, prepares an assessment with highlighted documents, then explains an improvement plan pointing at a chart on a large screen in a hospital meeting room; the same woman throughout; no other people; do not restyle or recast the presenter",
+  "scene_prompt": "modern Egyptian hospital, early morning golden light, clean premium interiors, cinematic camera movement, shallow depth of field"
+ },
+ "C6_door_walk": {
+  "mode": "scenes",
+  "character_id": "398790b9-47b6-4dfb-bcbf-3e096cce0d2a",
+  "voice_mode": "none",
+  "target_seconds": 5,
+  "video_idea": "one woman, healthcare quality specialist in a grey blazer, walks confidently down a long bright hospital corridor away from camera and pushes open a glass double door into brilliant warm light; the same woman throughout; no other people; do not restyle or recast the presenter",
+  "scene_prompt": "modern Egyptian hospital, early morning golden light, clean premium interiors, cinematic camera movement, shallow depth of field"
+ },
+ "C7_celebration_walk": {
+  "mode": "scenes",
+  "character_id": "76a49a90-9ca9-4a61-a6ff-5f999569915e",
+  "voice_mode": "none",
+  "target_seconds": 5,
+  "video_idea": "one man, senior physician in a white doctor's coat, walks through a hospital lobby smiling proudly, gives a small celebratory nod and applauds toward the camera; the same man throughout; no other people; do not restyle or recast the presenter",
+  "scene_prompt": "modern Egyptian hospital, early morning golden light, clean premium interiors, cinematic camera movement, shallow depth of field"
  }
 }
