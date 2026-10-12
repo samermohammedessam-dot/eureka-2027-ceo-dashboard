@@ -10,3 +10,7 @@ pass_the_light/cast/
 pass_the_light/__pycache__/
 pass_the_light/clips/
 pass_the_light/audio/
+# THE POWER OF TEN: media stays local (public repo)
+EUREKA_THE_POWER_OF_TEN/*.mp4
+EUREKA_THE_POWER_OF_TEN/*.wav
+EUREKA_THE_POWER_OF_TEN/__pycache__/
