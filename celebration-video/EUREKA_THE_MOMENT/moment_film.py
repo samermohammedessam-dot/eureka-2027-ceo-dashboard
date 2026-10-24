@@ -649,7 +649,7 @@ def mix_audio(t0, t1, out):
         ins += ['-i', os.path.join(au, f'{k}.wav')]
     vo = [f'[{i + 2}:a]adelay={int(VO_AT[k] * 1000)}|{int(VO_AT[k] * 1000)},volume=1.25[{k}]' for i, k in enumerate(['vo1', 'vo2', 'vo3', 'vo4'])]
     eu = f'[1:a]atrim=0:2.3,asetpts=PTS-STARTPTS,highpass=f=90,aecho=0.8:0.6:60|140:0.25|0.15,volume=1.5,adelay={int(EUREKA_AT * 1000)}|{int(EUREKA_AT * 1000)}[eu]'
-    fc = ';'.join(vo + [eu, '[vo1][vo2][vo3][vo4][eu]amix=inputs=5:normalize=0,asplit[voice][key]',
+    fc = ';'.join(vo + [eu, f'[vo1][vo2][vo3][vo4][eu]amix=inputs=5:normalize=0,apad=whole_dur={DUR},asplit[voice][key]',
                         '[0:a][key]sidechaincompress=threshold=0.04:ratio=5:attack=20:release=400[duck]',
                         f'[duck][voice]amix=inputs=2:normalize=0,atrim={t0}:{t1},asetpts=PTS-STARTPTS,alimiter=limit=0.95[a]'])
     subprocess.run(['ffmpeg', '-v', 'error', '-y'] + ins + ['-filter_complex', fc, '-map', '[a]', '-c:a', 'pcm_s16le', out], check=True)
