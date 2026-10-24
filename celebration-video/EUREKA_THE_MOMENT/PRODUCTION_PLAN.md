@@ -19,11 +19,11 @@ Archimedes appears as a fictional artistic interpretation of the legend.
 | A1 | Archimedes studies the crown and lowers it; the water overflows (10 s) | Scene 1 | 9 | 4 |
 | A2 | Realization; he exclaims (5 s) | Scene 1 | 6 | 4 |
 | A3 | Golden light rises from the water (5 s) | Scene 1 → 2 | 6 | 4 |
-| H1 | Dr. Karim, medical director, corridor with a tablet | Who we are | 6 | 4 |
-| H2 | Amira, accreditation and quality walk-round | What we do | 6 | 4 |
-| H3 | Dr. Karim, strategy roadmap on glass | What we do | 6 | 4 |
-| H4 | Nour, nurse educator, simulation training | What we do | 6 | 4 |
-| H5 | Amira, a completed new hospital wing | Turnkey projects | 6 | 4 |
+| H1 | Actor 1 (male medical director), corridor with a tablet | Who we are | 6 | 4 |
+| H2 | Actor 2 (female quality professional), accreditation and quality walk-round | What we do | 6 | 4 |
+| H3 | Actor 1, strategy roadmap on glass | What we do | 6 | 4 |
+| H4 | Actor 3 (female nurse educator), simulation training | What we do | 6 | 4 |
+| H5 | Actor 2, a completed new hospital wing | Turnkey projects | 6 | 4 |
 
 - **Video and stills:** 51 + 32 = 83 credits.
 - **TTS:** "Eureka!" 10, plus all four voiceover lines in one call (409 characters) 10 = 20 credits.
@@ -35,7 +35,7 @@ Archimedes appears as a fictional artistic interpretation of the legend.
 
 | Time | Scene | Build |
 |---|---|---|
-| 0–15 | The Discovery | A1 (tilt from basin to face) → A2 with "Eureka!" → A3 golden energy |
+| 0–15 | The Discovery | 0–6.5 A1 (tilt from basin to face) → 6.5–10.5 A2, "Eureka!" at 9.0 → 10.5–15 A3 golden energy, handing off at 15 |
 | 15–30 | Discovery to purpose | Dive into the ripples → gold geometry → blueprints → hospital architecture → **Eureka logo**. VO 1 |
 | 30–50 | Who we are | H1 + real Eureka team photos with cinematic moves. VO 2 |
 | 50–75 | What we do | 7 services, about 3.5 s each. H2 accreditation, H3 strategy, H4 training and H5 turnkey are Promoat clips; operations, organizational development / HR and business development use real photos and animated systems graphics |

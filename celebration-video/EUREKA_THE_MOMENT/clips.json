@@ -12,7 +12,8 @@
       "resolution": "1080P",
       "video_mode": "reference",
       "video_idea": "One man only: a fictional artistic interpretation of Archimedes, a Greek scholar in his sixties with a short silver beard, cream chiton and terracotta himation; the same man throughout; no other people; do not restyle or recast him. Ancient Syracuse, a stone bath chamber at golden hour. He stands behind a wide bronze basin filled to the brim with still water, holding a golden laurel crown in both hands. He studies the crown closely, turning it in the warm sunlight, then slowly lowers it into the basin; the water rises and spills over the rim in glittering streams. He watches the overflow intently, curious. Tall composition: basin and crown in the lower half of the frame, his face in the upper half, he stays centred. Slow, steady camera push-in. Realistic, natural movement.",
-      "scene_prompt": "Ancient Greek stone bath chamber in Syracuse, golden-hour sunlight through limestone columns, warm dust in sunbeams, bronze basin brimming with water, golden laurel crown, photorealistic cinematic film still, shallow depth of field, film grain, no text, no logos"
+      "scene_prompt": "Ancient Greek stone bath chamber in Syracuse, golden-hour sunlight through limestone columns, warm dust in sunbeams, bronze basin brimming with water, golden laurel crown, photorealistic cinematic film still, shallow depth of field, film grain, no text, no logos",
+      "_actor": "archimedes_interpretation"
     },
     "B_realization": {
       "mode": "scenes",
@@ -21,7 +22,8 @@
       "resolution": "1080P",
       "video_mode": "reference",
       "video_idea": "The same man only, a fictional artistic interpretation of Archimedes with a short silver beard, cream chiton and terracotta himation; no other people; do not restyle or recast him. Medium close-up at golden hour beside the overflowing bronze basin. He stares at the spilling water; his expression changes from curiosity to sudden realization: his eyes widen, a delighted smile breaks, he lifts his head toward the light and exclaims a single word with an open mouth. Slow camera push-in toward his face. Realistic, natural movement.",
-      "scene_prompt": "Close-up of a Greek scholar in golden-hour light, ancient stone bath chamber, water droplets glittering, warm rim light on his face, photorealistic cinematic film still, shallow depth of field, film grain, no text, no logos"
+      "scene_prompt": "Close-up of a Greek scholar in golden-hour light, ancient stone bath chamber, water droplets glittering, warm rim light on his face, photorealistic cinematic film still, shallow depth of field, film grain, no text, no logos",
+      "_actor": "archimedes_interpretation"
     },
     "A3_golden_energy": {
       "mode": "scenes",
@@ -30,7 +32,8 @@
       "resolution": "1080P",
       "video_mode": "reference",
       "video_idea": "The same man only, a fictional artistic interpretation of Archimedes with a short silver beard, cream chiton and terracotta himation; no other people; do not restyle or recast him. Golden hour in the stone bath chamber. Warm golden light begins to glow up from the surface of the bronze basin and rises in shimmering motes; he gazes at it in quiet awe, the glow lighting his face from below. Slow camera rise. Realistic, natural movement.",
-      "scene_prompt": "Warm golden light rising from water in a bronze basin, ancient Greek stone chamber at golden hour, glowing motes, photorealistic cinematic film still, shallow depth of field, film grain, no text, no logos"
+      "scene_prompt": "Warm golden light rising from water in a bronze basin, ancient Greek stone chamber at golden hour, glowing motes, photorealistic cinematic film still, shallow depth of field, film grain, no text, no logos",
+      "_actor": "archimedes_interpretation"
     },
     "H1_leadership": {
       "mode": "scenes",
@@ -39,7 +42,8 @@
       "resolution": "1080P",
       "video_mode": "reference",
       "video_idea": "One male medical director, the same man throughout; no other people; do not restyle or recast him. He walks along a bright modern hospital corridor reviewing performance dashboards on a tablet, then looks up with quiet determination. Calm, confident, realistic natural movement. Slow cinematic camera move.",
-      "scene_prompt": "Bright modern hospital corridor, glass and warm wood, daylight, photorealistic cinematic film still, soft natural light, shallow depth of field, no text, no logos, no brand names"
+      "scene_prompt": "Bright modern hospital corridor, glass and warm wood, daylight, photorealistic cinematic film still, soft natural light, shallow depth of field, no text, no logos, no brand names",
+      "_actor": "actor_1_male_medical_director"
     },
     "H2_accreditation": {
       "mode": "scenes",
@@ -48,7 +52,8 @@
       "resolution": "1080P",
       "video_mode": "reference",
       "video_idea": "One female quality professional, the same woman throughout; no other people; do not restyle or recast her. She conducts a quality and accreditation walk-round in a modern ward, checking items on a clipboard checklist and nodding with approval. Calm, confident, realistic natural movement. Slow cinematic camera move.",
-      "scene_prompt": "Modern clean hospital ward, accreditation review, daylight, photorealistic cinematic film still, soft natural light, shallow depth of field, no text, no logos, no brand names"
+      "scene_prompt": "Modern clean hospital ward, accreditation review, daylight, photorealistic cinematic film still, soft natural light, shallow depth of field, no text, no logos, no brand names",
+      "_actor": "actor_2_female_quality_professional"
     },
     "H3_strategy": {
       "mode": "scenes",
@@ -57,7 +62,8 @@
       "resolution": "1080P",
       "video_mode": "reference",
       "video_idea": "One male medical director, the same man throughout; no other people; do not restyle or recast him. In a glass-walled meeting room he studies a strategy roadmap on a large wall screen and draws a confident arrow with a marker on the glass. Calm, confident, realistic natural movement. Slow cinematic camera move.",
-      "scene_prompt": "Modern hospital boardroom with glass walls and city view, dusk light, photorealistic cinematic film still, soft natural light, shallow depth of field, no text, no logos, no brand names"
+      "scene_prompt": "Modern hospital boardroom with glass walls and city view, dusk light, photorealistic cinematic film still, soft natural light, shallow depth of field, no text, no logos, no brand names",
+      "_actor": "actor_1_male_medical_director"
     },
     "H4_training": {
       "mode": "scenes",
@@ -66,7 +72,8 @@
       "resolution": "1080P",
       "video_mode": "reference",
       "video_idea": "One female nurse educator, the same woman throughout; no other people; do not restyle or recast her. In a clinical simulation lab she demonstrates a procedure on a training mannequin, speaking calmly as if teaching, then smiles. Calm, confident, realistic natural movement. Slow cinematic camera move.",
-      "scene_prompt": "Modern clinical simulation training lab, mannequin on bed, monitors, photorealistic cinematic film still, soft natural light, shallow depth of field, no text, no logos, no brand names"
+      "scene_prompt": "Modern clinical simulation training lab, mannequin on bed, monitors, photorealistic cinematic film still, soft natural light, shallow depth of field, no text, no logos, no brand names",
+      "_actor": "actor_3_female_nurse_educator"
     },
     "H5_turnkey": {
       "mode": "scenes",
@@ -75,7 +82,8 @@
       "resolution": "1080P",
       "video_mode": "reference",
       "video_idea": "One female quality professional, the same woman throughout; no other people; do not restyle or recast her. She walks through a newly completed modern hospital wing, running her hand along a reception desk and looking around with pride. Calm, confident, realistic natural movement. Slow cinematic camera move.",
-      "scene_prompt": "Newly completed modern hospital lobby, pristine, natural light, plants, photorealistic cinematic film still, soft natural light, shallow depth of field, no text, no logos, no brand names"
+      "scene_prompt": "Newly completed modern hospital lobby, pristine, natural light, plants, photorealistic cinematic film still, soft natural light, shallow depth of field, no text, no logos, no brand names",
+      "_actor": "actor_2_female_quality_professional"
     }
   },
   "eureka_line": {
@@ -87,13 +95,14 @@
       "similarity_boost": 0.75,
       "style": 0.6,
       "speed": 0.9
-    }
+    },
+    "_at_seconds": 9.0
   },
   "characters": {
-    "archimedes": "3e3020c1-ea68-45d0-a06d-5247040f74ea",
-    "karim": "76a49a90-9ca9-4a61-a6ff-5f999569915e",
-    "amira": "398790b9-47b6-4dfb-bcbf-3e096cce0d2a",
-    "nour": "be9c29a6-3e43-475d-bfff-c66affa704b5"
+    "archimedes_interpretation": "3e3020c1-ea68-45d0-a06d-5247040f74ea",
+    "actor_1_male_medical_director": "76a49a90-9ca9-4a61-a6ff-5f999569915e",
+    "actor_2_female_quality_professional": "398790b9-47b6-4dfb-bcbf-3e096cce0d2a",
+    "actor_3_female_nurse_educator": "be9c29a6-3e43-475d-bfff-c66affa704b5"
   },
   "voiceover": {
     "voice_id": "sv_daniel_d3c257bd7b64",
@@ -103,5 +112,10 @@
       "Behind every achievement are extraordinary people, trusted partnerships, and a shared belief that healthcare can always be better.",
       "And our journey of transformation continues."
     ]
+  },
+  "scene1_timing": {
+    "A_discovery": "0.0-6.5 s (best 6.5 s of the 10 s clip; frame tilts from basin to face)",
+    "B_realization": "6.5-10.5 s ('Eureka!' lands at 9.0 s)",
+    "A3_golden_energy": "10.5-15.0 s (golden light rises; hands off into Scene 2 at 15 s)"
   }
 }
