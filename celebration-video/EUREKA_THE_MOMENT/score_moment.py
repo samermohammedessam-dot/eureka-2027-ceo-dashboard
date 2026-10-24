@@ -31,6 +31,7 @@ SERV_T0, SERV_DUR = WHAT + 1.8, (IMPACT - WHAT - 1.8) / 7
 IMP_T0 = IMPACT + 2.2
 IMP_DUR = (PEOPLE - IMP_T0) / 8
 FINALE = FUTURE + 4.2
+GOLDEN = EUREKA + 1.45
 CH = {'D': [50, 54, 57], 'A': [45, 49, 52], 'Bm': [47, 50, 54], 'G': [43, 47, 50], 'F#m': [42, 45, 49], 'Em': [40, 43, 47]}
 MOTIF = [71, 74, 78, 76]   # B4 D5 F#5 E5 — the "discovery" motif
 
@@ -107,12 +108,13 @@ def compose():
     for j, m in enumerate([59, 62, 66, 71]):
         pad.add(11.1, strings_pad(mf(m + 12), 2.1, 2600), 0.06, pan=(j - 1.5) * 0.4)
     # 13.1 EUREKA!
-    hit(perc, fx, brs, EUREKA, 1.25, 'D')
+    hit(perc, fx, brs, EUREKA, 0.75, 'D')                   # under the shout (the voice stays clear)
+    hit(perc, fx, brs, GOLDEN, 1.25, 'D')                   # the golden light bursts from the water
     for j, m in enumerate([74, 78, 81, 86, 90, 93, 98]):
-        bell.add(EUREKA + 0.15 + 0.11 * j, celesta(mf(m), 2.6), 0.12)
+        bell.add(GOLDEN + 0.15 + 0.11 * j, celesta(mf(m), 2.6), 0.12)
     pads(pad, low, EUREKA, PURPOSE, 2.4, 0.08, 2600)
     for j, m in enumerate([86, 90, 93, 98, 102]):            # golden light from the water
-        bell.add(15.7 + 0.18 * j, celesta(mf(m), 2.2), 0.10)
+        bell.add(GOLDEN + 0.9 + 0.18 * j, celesta(mf(m), 2.2), 0.10)
     # 17-30 purpose
     pads(pad, low, PURPOSE, WHO, 2.4, 0.075, 2000)
     pulse(strs, perc, PURPOSE + 2.4, WHO - 0.2, 0.2, kick_on=False)
@@ -188,8 +190,8 @@ def compose():
 
 if __name__ == '__main__':
     out = sys.argv[1]
-    arc = ([0, 8.3, 11.0, EUREKA - 0.05, EUREKA, PURPOSE, WHO, WHAT, IMPACT, PEOPLE - 1, PEOPLE, FUTURE, FINALE, DUR - 2, DUR],
-           [-13, -11, -9, -6, 0, -4, -6, -4, -2, -1, -4, -3, 0, -2, -6])
+    arc = ([0, 8.3, 11.0, EUREKA - 0.05, EUREKA, GOLDEN, PURPOSE, WHO, WHAT, IMPACT, PEOPLE - 1, PEOPLE, FUTURE, FINALE, DUR - 2, DUR],
+           [-13, -11, -9, -6, -3, 0, -4, -6, -4, -2, -1, -4, -3, 0, -2, -6])
     x = M.mix(*compose(), arc=arc)
     M.write_wav(out, x)
     print('wrote', out)

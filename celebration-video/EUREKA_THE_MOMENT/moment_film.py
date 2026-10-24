@@ -151,10 +151,28 @@ def arch_meta():
     return json.load(open(p)) if os.path.exists(p) else None
 
 
-def s1_discovery(cv, t):
+EUREKA_CUT = 1.45          # use only the first, strongest-looking "Eureka!" (the water thrown skyward)
+T_GOLD = EUREKA_AT + EUREKA_CUT
+
+
+def arch_time(t):
+    """Film time -> plate time: the voiced insert is cut after the first shout, then the water close-up."""
+    if t < T_GOLD:
+        return t
     m = arch_meta()
-    fr = plate_frame('arch', t)
+    w0, w1 = (m['edl'][-1][0], m['edl'][-1][1]) if m else (15.7, 16.76)
+    return min(w0 + (t - T_GOLD), w1 - 0.01)
+
+
+def s1_discovery(cv, t):
+    fr = plate_frame('arch', arch_time(t))
     if fr is not None:
+        z = 1 + 0.10 * ease_io(seg(t, T_GOLD + 0.6, T_PURPOSE))         # the camera sinks toward the water
+        if z > 1.001:
+            cw, ch = int(W / z), int(H / z)
+            x0, y0 = (W - cw) // 2, int((H - ch) * 0.62)
+            fr = np.asarray(Image.fromarray((fr * 255).astype(np.uint8)).resize((W, H), Image.LANCZOS,
+                            box=(x0, y0, x0 + cw, y0 + ch)), np.float32) / 255
         cv[:] = grade_warm(fr)
     cv *= ease_out(seg(t, 0.0, 1.2))
     # caption: the legend, honestly labelled
@@ -162,20 +180,17 @@ def s1_discovery(cv, t):
     quiet(cv, W / 2, 960, 700, 70, 0.45 * q)
     text(cv, 'SYRACUSE  ·  THE LEGEND OF ARCHIMEDES', W / 2, 940, 30, 'mont', 'gold', q, 10, 0.2, 600)
     text(cv, 'An artistic interpretation', W / 2, 985, 22, 'mont', 'ivory', q * 0.8, 4, 0.0, 400)
-    # the golden light rising from the water (last plate segment)
-    if m:
-        t_gold = m['edl'][-1][0]
-        u = seg(t, t_gold - 0.2, DUR)
-        g = ease_io(seg(t, t_gold, t_gold + 1.6))
-        if g > 0:
-            PF.glow(cv, W / 2, H * 0.62, 260 + 700 * g, GOLD, 0.9 * g)
-            for k in range(40):
-                rng = np.random.default_rng(k)
-                x0, sp = rng.uniform(0.2, 0.8) * W, rng.uniform(140, 380)
-                y = H * 0.75 - (t - t_gold) * sp - rng.uniform(0, 200)
-                if 0 < y < H:
-                    R.splat(cv, x0 + 30 * math.sin(t * 2 + k), y, rng.uniform(2, 5), 1.2 * g * (1 - seg(y, H * 0.75, 0) * 0.3))
-        _ = u
+    # the golden light rising from the water
+    g = ease_io(seg(t, T_GOLD, T_GOLD + 1.6))
+    if g > 0:
+        PF.glow(cv, W / 2, H * 0.62, 260 + 700 * g, GOLD, 0.9 * g)
+        for k in range(40):
+            rng = np.random.default_rng(k)
+            x0, sp = rng.uniform(0.2, 0.8) * W, rng.uniform(140, 380)
+            y = H * 0.75 - (t - T_GOLD) * sp - rng.uniform(0, 200)
+            if 0 < y < H:
+                R.splat(cv, x0 + 30 * math.sin(t * 2 + k), y, rng.uniform(2, 5), 1.2 * g)
+    cv[:] = cv * (1 - 0.5 * seg(t, T_PURPOSE - 0.5, T_PURPOSE)) + GOLD * 0.25 * seg(t, T_PURPOSE - 0.5, T_PURPOSE)
     return t > 3.0
 
 
@@ -648,7 +663,7 @@ def mix_audio(t0, t1, out):
     for k in ('vo1', 'vo2', 'vo3', 'vo4'):
         ins += ['-i', os.path.join(au, f'{k}.wav')]
     vo = [f'[{i + 2}:a]adelay={int(VO_AT[k] * 1000)}|{int(VO_AT[k] * 1000)},volume=1.25[{k}]' for i, k in enumerate(['vo1', 'vo2', 'vo3', 'vo4'])]
-    eu = f'[1:a]atrim=0:2.3,asetpts=PTS-STARTPTS,highpass=f=90,aecho=0.8:0.6:60|140:0.25|0.15,volume=1.5,adelay={int(EUREKA_AT * 1000)}|{int(EUREKA_AT * 1000)}[eu]'
+    eu = f'[1:a]atrim=0:{EUREKA_CUT + 0.05},afade=out:st={EUREKA_CUT - 0.1}:d=0.15,asetpts=PTS-STARTPTS,highpass=f=90,aecho=0.8:0.6:60|140:0.25|0.15,volume=1.5,adelay={int(EUREKA_AT * 1000)}|{int(EUREKA_AT * 1000)}[eu]'
     fc = ';'.join(vo + [eu, f'[vo1][vo2][vo3][vo4][eu]amix=inputs=5:normalize=0,apad=whole_dur={DUR},asplit[voice][key]',
                         '[0:a][key]sidechaincompress=threshold=0.04:ratio=5:attack=20:release=400[duck]',
                         f'[duck][voice]amix=inputs=2:normalize=0,atrim={t0}:{t1},asetpts=PTS-STARTPTS,alimiter=limit=0.95[a]'])
