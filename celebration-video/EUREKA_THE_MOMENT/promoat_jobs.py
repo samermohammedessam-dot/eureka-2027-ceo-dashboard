@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.join(HERE, '..', 'pass_the_light'))
 import promoat as P  # noqa: E402
 
 BUDGET, START_BALANCE = 400, 736       # approved: up to 400 credits from the 736 balance
-FLOOR = START_BALANCE - BUDGET
+FLOOR = 350                            # revision approval: up to 110 more credits from the 460 balance
 OUT = os.path.join(HERE, '..', 'build', 'moment')
 IDS = os.path.join(HERE, 'ids.json')
 

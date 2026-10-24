@@ -153,6 +153,59 @@
         "Shot B: he stands, buttons his jacket and walks toward floor-to-ceiling windows with a city skyline at golden hour, looking ahead with ambition; tracking shot, medium-wide."
       ],
       "scene_prompt": "elegant modern executive conference room with a city skyline at golden hour, premium modern hospital, natural daylight, photorealistic cinematic healthcare brand film, shallow depth of field, no text, no logos, no brand names"
+    },
+    "C1_insight": {
+      "_actor": "actor_1_male_medical_director",
+      "mode": "scenes",
+      "voice_mode": "none",
+      "target_seconds": 5,
+      "resolution": "1080P",
+      "video_mode": "reference",
+      "video_idea": "One man only, a senior medical director in his fifties wearing a tailored navy suit; the same man throughout; no other people; do not restyle or recast him. He never looks into the camera and never speaks to camera.",
+      "scene_lines": [
+        "Late evening in a dim executive office surrounded by stacks of reports and screens of complex charts, he leans over the desk rubbing his temple, overwhelmed by a difficult decision; then he pauses, his eyes widen with sudden insight and he straightens up with a quiet, confident smile; slow push-in, medium shot."
+      ],
+      "scene_prompt": "dim executive office at night, stacks of reports, glowing screens with complex charts, photorealistic cinematic healthcare brand film, natural light, shallow depth of field, no readable text, no logos, no brand names"
+    },
+    "Q2_quality": {
+      "_actor": "actor_2_female_quality_professional",
+      "mode": "scenes",
+      "voice_mode": "none",
+      "target_seconds": 5,
+      "resolution": "1080P",
+      "video_mode": "reference",
+      "video_idea": "One woman only, a senior healthcare quality professional in a smart navy blazer; the same woman throughout; no other people; do not restyle or recast her. She never looks into the camera and never speaks to camera.",
+      "scene_lines": [
+        "In a hospital quality office she reviews clinical-governance audit files and a patient-safety dashboard on a large monitor, carefully ticking items with a pen, focused and meticulous; slow lateral camera move, medium shot."
+      ],
+      "scene_prompt": "modern hospital quality and patient-safety office with audit files and a dashboard monitor, photorealistic cinematic healthcare brand film, natural light, shallow depth of field, no readable text, no logos, no brand names"
+    },
+    "O2_operations": {
+      "_actor": "actor_3_female_nurse_educator",
+      "mode": "scenes",
+      "voice_mode": "none",
+      "target_seconds": 5,
+      "resolution": "1080P",
+      "video_mode": "reference",
+      "video_idea": "One woman only, a nurse educator in light-blue scrubs; the same woman throughout; no other people; do not restyle or recast her. She never looks into the camera and never speaks to camera.",
+      "scene_lines": [
+        "In a modern hospital command centre with large wall screens of patient-flow dashboards, she coordinates calmly, pointing to the screen and adjusting a plan on a tablet with efficient confidence; slow arc around her, medium shot."
+      ],
+      "scene_prompt": "modern hospital operations command centre with large wall screens, photorealistic cinematic healthcare brand film, natural light, shallow depth of field, no readable text, no logos, no brand names"
+    },
+    "T2_turnkey": {
+      "_actor": "actor_1_male_medical_director",
+      "mode": "scenes",
+      "voice_mode": "none",
+      "target_seconds": 10,
+      "resolution": "1080P",
+      "video_mode": "reference",
+      "video_idea": "One man only, a senior medical director in his fifties wearing a tailored navy suit; the same man throughout; no other people; do not restyle or recast him. He never looks into the camera and never speaks to camera.",
+      "scene_lines": [
+        "Shot A: wearing a white hard hat over his suit, he reviews large architectural hospital floor plans spread on a table at a modern hospital construction site, pointing at the plan with purpose; slow push-in, medium shot.",
+        "Shot B: he walks into a brand-new, fully equipped hospital patient room where new medical equipment has just been installed, and looks around with quiet satisfaction; smooth tracking shot, medium-wide."
+      ],
+      "scene_prompt": "modern hospital construction site and a newly equipped hospital room, photorealistic cinematic healthcare brand film, natural light, shallow depth of field, no readable text, no logos, no brand names"
     }
   },
   "eureka_line": {
