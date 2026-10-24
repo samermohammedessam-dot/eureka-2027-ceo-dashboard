@@ -95,6 +95,31 @@ def build_arch():
     print('arch plate', len(frames), 'frames')
 
 
+def build_window(src_name, a, b, keys, out_name):
+    """One AI-upscaled 16:9 window segment (same pipeline as the arch plate), e.g. the wide shout."""
+    sys.path.insert(0, HERE)
+    import torch
+    import sr
+    torch.set_num_threads(os.cpu_count() or 4)
+    net = sr.load_model()
+    src = decode(os.path.join(SRC, f'{src_name}.mp4'), a, b)
+    os.makedirs(OUT, exist_ok=True)
+    mm = np.lib.format.open_memmap(os.path.join(OUT, f'{out_name}.npy'), 'w+', np.uint8, (len(src), 1080, 1920, 3))
+    for j, fr in enumerate(src):
+        H0, W0, _ = fr.shape
+        yf, wf = interp(keys, j / SFPS)
+        cw = int(W0 * wf) // 2 * 2
+        ch = int(cw * 9 / 16) // 2 * 2
+        x0 = (W0 - cw) // 2
+        y0 = int(np.clip(yf * H0, 0, H0 - ch))
+        win = np.ascontiguousarray(fr[y0:y0 + ch, x0:x0 + cw])
+        ai = np.asarray(Image.fromarray(sr.upscale_frame(net, win)).resize((1920, 1080), Image.LANCZOS), np.float32)
+        lz = np.asarray(Image.fromarray(win).resize((1920, 1080), Image.LANCZOS), np.float32)
+        mm[j] = np.clip(0.72 * ai + 0.28 * lz, 0, 255).astype(np.uint8)
+        print(f'{out_name} {j + 1}/{len(src)}', flush=True)
+    mm.flush()
+
+
 def build_panel(name):
     fr = decode(os.path.join(SRC, f'{name}.mp4'), scale=(PW, PH))
     os.makedirs(OUT, exist_ok=True)
@@ -105,6 +130,8 @@ def build_panel(name):
 if __name__ == '__main__':
     if sys.argv[1] == 'arch':
         build_arch()
+    elif sys.argv[1] == 'window':      # window <src> <t0> <t1> <out> '<json keys>'
+        build_window(sys.argv[2], float(sys.argv[3]), float(sys.argv[4]), json.loads(sys.argv[6]), sys.argv[5])
     elif sys.argv[1] == 'panels':
         for n in sys.argv[2:]:
             build_panel(n)

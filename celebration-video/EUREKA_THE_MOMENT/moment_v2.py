@@ -26,6 +26,18 @@ from moment_film import (GOLD, NAVY, WARM, H, W, FPS, PF, R, ST, composite, draw
                          grade_warm, hline, lerp, panel, plate, quiet, seg, text, text_layer, tonemap)
 
 DUR = tl.DUR
+
+_plate_frame = M.plate_frame
+
+
+def _plate_frame_v2(name, t):
+    """Inside the shout, use the wide re-performance (same audio) when its upscaled plate exists."""
+    if name == 'arch' and tl.EUREKA_AT <= t < tl.T_GOLD and plate('A4w_win') is not None:
+        return _plate_frame('A4w_win', t - tl.EUREKA_AT)
+    return _plate_frame(name, t)
+
+
+M.plate_frame = _plate_frame_v2
 BUILD = M.BUILD
 LOGOS = os.path.join(M.ROOT, 'assets_logos')
 STEEL = np.array([0.45, 0.62, 0.85], np.float32)
@@ -34,22 +46,26 @@ SERVICES = [  # title lines, descriptor, two actor panels (clip, in-point); a ne
     (('HEALTHCARE STRATEGY', '& BUSINESS DEVELOPMENT'), 'Strategy, growth and the decisions that shape institutions',
      [('H3_strategy', 4.3), ('H8_business', 0.5)]),
     (('ACCREDITATION', '& QUALITY EXCELLENCE'), 'Accreditation readiness, patient safety and clinical governance',
-     [('H2_accreditation', 0.4), ('Q2_quality|H2_accreditation', 4.6)]),
+     [('H2_accreditation', 0.4), ('Q2_quality@0.3|H2_accreditation@4.6', 0)]),
     (('TURNKEY', 'HEALTHCARE PROJECTS'), 'From planning and design to operational readiness and launch',
-     [('T2_turnkey|H5_turnkey', 5.0), ('H5_turnkey', 0.5)]),
+     [('T2_turnkey@0.4|H5_turnkey@5.0', 0), ('H5_turnkey', 0.5)]),
     (('TRAINING &', 'ORGANIZATIONAL DEVELOPMENT'), 'Skills, leadership and teams built for excellence',
      [('H4_training', 0.4), ('H7_orgdev', 2.8)]),
     (('OPERATIONS &', 'PERFORMANCE IMPROVEMENT'), 'Patient journeys, clinical workflow and efficient service delivery',
-     [('H6_operations', 0.5), ('O2_operations|H6_operations', 5.2)]),
+     [('H6_operations', 0.5), ('O2_operations@0.3|H6_operations@5.2', 0)]),
 ]
 
 
-def clip(spec):
-    """'NEW|FALLBACK' -> the new clip if its plate exists, else the approved fallback."""
-    for name in spec.split('|'):
+def clip(spec, c0=0.0):
+    """'NEW@in|FALLBACK@in' -> (clip, in-point): the new clip if its plate exists, else the approved fallback."""
+    opts = []
+    for part in spec.split('|'):
+        name, _, at = part.partition('@')
+        opts.append((name, float(at) if at else c0))
+    for name, at in opts:
         if plate(name) is not None:
-            return name
-    return spec.split('|')[-1]
+            return name, at
+    return opts[-1]
 
 
 # ------------------------------------------------------------------ 2  THE BRIDGE (problem -> solution)
@@ -70,8 +86,7 @@ def s2_bridge(cv, t):
     cv[:] = NAVY * 0.9
     insight = seg(u, 4.9, 5.7)
     fade_in = ease_out(seg(u, 2.4, 2.9))
-    lead = clip('C1_insight|H3_strategy')
-    c0 = 0.5 if lead == 'H3_strategy' else 0.3
+    lead, c0 = clip('C1_insight@0.3|H3_strategy@0.5')
     panel(cv, lead, c0 + (u - 2.4), 1400, 540, 0.9, ease_out(seg(u, 2.4, 2.9)))
     cv[:, 1100:] *= (1 - 0.35 * (1 - insight))                         # cool, uncertain until the insight
     cv[:, 1100:] = cv[:, 1100:] * (1 - 0.25 * (1 - insight)) + cv[:, 1100:].mean(axis=2, keepdims=True) * STEEL * 0.25 * (1 - insight)
@@ -123,7 +138,8 @@ def s4_what(cv, t):
     for j, (spec, c0) in enumerate(clips):
         qq = ease_out(seg(v, 0.05 + 0.25 * j, 0.6 + 0.25 * j))
         x = 1090 + j * 480
-        panel(cv, clip(spec), c0 + v, x + 60 * (1 - qq), 585, 0.74, qq)
+        name, at = clip(spec, c0)
+        panel(cv, name, at + v, x + 60 * (1 - qq), 585, 0.74, qq)
     q = seg(v, 0.2, 0.8)
     text(cv, f'0{k + 1}', 430, 380, 40, 'mont', 'gold', ease_io(q), 10, 0.3, 600)
     for j, (ln, yy, a0) in enumerate([(l1, 460, 0.2), (l2, 530, 0.32)]):
