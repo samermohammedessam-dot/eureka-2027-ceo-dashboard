@@ -1,42 +1,52 @@
-# THE EUREKA MOMENT — FROM INSIGHT TO IMPACT
-## Phase 1: 25-second proof of concept (`EUREKA_ARCHIMEDES_POC.mp4`)
+# EUREKA — THE MOMENT · FROM DISCOVERY TO IMPACT
+135-second 16:9 cinematic brand film. This is a separate project: PASS THE LIGHT and THE POWER OF TEN are not touched.
+Archimedes appears as a fictional artistic interpretation of the legend.
 
-Separate project. PASS THE LIGHT and THE POWER OF TEN are not touched.
-The Archimedes scene is presented as an artistic interpretation of the legend, not documentary fact.
+## Tools
+- **Promoat Partner API** (skill v1.1.1, price table 2026-10-11, existing `PROMOAT_KEY`):
+  - silent 9:16 *scenes* clips at 1080P, one presenter per clip;
+  - opening stills (first frames) to approve each look before any video is generated;
+  - text-to-speech for the voiceover and the "Eureka!" line.
+- **Local pipeline (free):** water and light, blueprints, real Eureka photos, counters, logos, the corner brand, orchestral score, mix and edit. It reuses `render.py`, `music.py` and the POWER OF TEN stage and photo-journey code.
+- **9:16 → 16:9 without stretching or blurred side panels:**
+  - Archimedes shots are composed tall. The 16:9 frame then tilts and pushes inside the tall image (basin → face), giving a real camera move.
+  - Modern scenes sit as a full-height cinematic panel next to typography and animated graphics.
 
-### Tool review (Oct 12, 2026)
+## Promoat clips (live estimates, all silent, 1080P)
 
-| Tool | 16:9 photoreal video? | Status here |
+| # | Clip | Use | Video (with approved still) | Still |
+|---|---|---|---|---|
+| A1 | Archimedes studies the crown and lowers it; the water overflows (10 s) | Scene 1 | 9 | 4 |
+| A2 | Realization; he exclaims (5 s) | Scene 1 | 6 | 4 |
+| A3 | Golden light rises from the water (5 s) | Scene 1 → 2 | 6 | 4 |
+| H1 | Dr. Karim, medical director, corridor with a tablet | Who we are | 6 | 4 |
+| H2 | Amira, accreditation and quality walk-round | What we do | 6 | 4 |
+| H3 | Dr. Karim, strategy roadmap on glass | What we do | 6 | 4 |
+| H4 | Nour, nurse educator, simulation training | What we do | 6 | 4 |
+| H5 | Amira, a completed new hospital wing | Turnkey projects | 6 | 4 |
+
+- **Video and stills:** 51 + 32 = 83 credits.
+- **TTS:** "Eureka!" 10, plus all four voiceover lines in one call (409 characters) 10 = 20 credits.
+- **Total: 103 credits** of the 749 balance.
+- **Requested cap: 150**, which leaves room for a few retakes.
+- Prompts and request bodies are in `clips.json`.
+
+## Story breakdown (135 s)
+
+| Time | Scene | Build |
 |---|---|---|
-| Promoat (key present, 749 credits) | No. Output is always vertical 9:16 with one AI presenter. | Excluded, per the brief. |
-| Local renderer (`render.py`, `stage.py`, ffmpeg, `music.py`) | No photoreal people. | Free. Used for the ripple-to-blueprint graphics, the authentic Eureka logo, titles, music, grading and the edit. |
-| Google Veo 3.1 (Gemini API) | Yes. Native 16:9 at 1080p, 4/6/8 s clips, 24 fps, speech and sound generated with the video, image-to-video for a consistent character. | **Recommended. Not available yet:** this environment has no Gemini key. |
-| Runway Gen-4 / Kling / Luma | Yes (16:9). | Not available here. Runway and Kling would also need a separate voice tool for "Eureka!". |
-| gcloud | — | Its token is not a working Google Cloud credential. |
-| AWS keys (present) | Possibly Bedrock video models. | Not checked: the safety check blocked inspecting them. Use them only if you confirm they are yours for Bedrock. |
+| 0–15 | The Discovery | A1 (tilt from basin to face) → A2 with "Eureka!" → A3 golden energy |
+| 15–30 | Discovery to purpose | Dive into the ripples → gold geometry → blueprints → hospital architecture → **Eureka logo**. VO 1 |
+| 30–50 | Who we are | H1 + real Eureka team photos with cinematic moves. VO 2 |
+| 50–75 | What we do | 7 services, about 3.5 s each. H2 accreditation, H3 strategy, H4 training and H5 turnkey are Promoat clips; operations, organizational development / HR and business development use real photos and animated systems graphics |
+| 75–105 | The impact | 8 animated counters over real healthcare imagery and light trails. The **10 GAHAR** counter shows the ten real partner logos. *All figures to be confirmed by Eureka before the final render* |
+| 105–125 | People and partnerships | Photo journey of real teams, owners, training and accreditation moments. VO 3 |
+| 125–135 | The future | Golden light travels through the institutions → Eureka logo, "Healthcare Development Experts", "FROM INSIGHT TO IMPACT." VO 4 |
 
-### Shot plan (25 s)
+- The Eureka corner logo is visible throughout.
+- Original orchestral score, built locally to fit the edit.
 
-| Time | Shot | Source |
-|---|---|---|
-| 0–5 | Ancient Syracuse at golden hour. A slow dolly into a stone bath chamber. An older Greek scholar, an artistic interpretation of Archimedes, studies a golden crown beside a full water basin. | Veo, 8 s clip, trimmed |
-| 5–10 | Close-up. He lowers the crown into the water and it overflows. Realisation crosses his face and he quietly says "Eureka!" | Veo, 8 s clip with native speech |
-| 10–18 | The camera dives into the ripples, filmed as a macro shot. Gold geometric lines grow out of the rings, then architectural blueprints, then a healthcare system network (quality, accreditation, strategy, operations, people, training, growth). | Veo macro ripple clip (8 s) + local animated graphics |
-| 18–25 | A contemporary hospital at dusk, with the camera rising. It is a generic building with no invented signage or logos. Then the authentic Eureka logo and "FROM INSIGHT TO IMPACT." | Veo, 8 s clip + local logo and title |
-
-- The subtle Eureka corner logo is on screen throughout.
-- Original orchestral music is generated locally for free. Veo's own audio is used only for the line and the water.
-
-### Cost (Veo 3.1, 1080p, prices include audio)
-
-- 4 clips × 8 s = 32 s of generation.
-- **Fast tier** ($0.12/s): about $1 per clip, **about $4** for one set of clips.
-- **Standard tier** ($0.40/s): about $3.20 per clip, **about $13** for one set of clips.
-- **Recommended path:** first try the shots on Fast (about $4). Then render the final shots on Standard (about $13), with one retake each where needed.
-- **Hard cap requested: $30.**
-- These are published third-party rates. I'll check the live price before the first call and stop if it is higher.
-
-### Minimum approval needed
-
-1. Add a Gemini API key with billing enabled to this cloud environment's settings (environment menu → Edit → Network secrets, or as an environment variable) under the name `GEMINI_API_KEY`. Never paste it into chat. A new session picks it up.
-2. Approve a spend cap. I propose up to **$30**.
+## Approval steps
+1. **Test:** the A1 opening still (4 credits). Approve the look.
+2. Then the A1 video (9 credits). Approve its quality.
+3. Then the remaining clips and TTS (90 credits).
