@@ -16,74 +16,143 @@
       "_actor": "archimedes_interpretation"
     },
     "B_realization": {
+      "_actor": "archimedes_interpretation",
       "mode": "scenes",
       "voice_mode": "none",
-      "target_seconds": 5,
+      "target_seconds": 10,
       "resolution": "1080P",
       "video_mode": "reference",
-      "video_idea": "The same man only, a fictional artistic interpretation of Archimedes with a short silver beard, cream chiton and terracotta himation; no other people; do not restyle or recast him. Medium close-up at golden hour beside the overflowing bronze basin. He stares at the spilling water; his expression changes from curiosity to sudden realization: his eyes widen, a delighted smile breaks, he lifts his head toward the light and exclaims a single word with an open mouth. Slow camera push-in toward his face. Realistic, natural movement.",
-      "scene_prompt": "Close-up of a Greek scholar in golden-hour light, ancient stone bath chamber, water droplets glittering, warm rim light on his face, photorealistic cinematic film still, shallow depth of field, film grain, no text, no logos",
-      "_actor": "archimedes_interpretation"
+      "video_idea": "One man only: a fictional artistic interpretation of Archimedes, a Greek scholar in his sixties with silver hair and a short silver beard, wearing an ancient Greek cream wool chiton and a deep terracotta himation over one shoulder (no modern clothing); the same man throughout; no other people; do not restyle or recast him. He never looks into the camera.",
+      "scene_lines": [
+        "Shot A: three-quarter side view at golden hour; he bends over the wide bronze basin as the water overflows and pours over the bronze rim in glittering sheets onto the stone floor; he stares at the spilling water in complete stillness and silence, deep in thought.",
+        "Shot B: medium close-up from the side; realization dawns: his eyes widen, a delighted smile breaks across his face, he straightens up, lifts his head toward the sunlight and exclaims one joyful word with his mouth open and his arms opening wide; warm golden light on his face, slow camera push-in."
+      ],
+      "scene_prompt": "Ancient Syracuse stone bath chamber with columns at golden hour, wide bronze basin overflowing with water spilling onto wet stone, Greek scholar in cream chiton and terracotta himation, photorealistic historical film, cinematic, film grain, no text, no logos"
     },
     "A3_golden_energy": {
+      "_actor": "archimedes_interpretation",
       "mode": "scenes",
       "voice_mode": "none",
       "target_seconds": 5,
       "resolution": "1080P",
       "video_mode": "reference",
-      "video_idea": "The same man only, a fictional artistic interpretation of Archimedes with a short silver beard, cream chiton and terracotta himation; no other people; do not restyle or recast him. Golden hour in the stone bath chamber. Warm golden light begins to glow up from the surface of the bronze basin and rises in shimmering motes; he gazes at it in quiet awe, the glow lighting his face from below. Slow camera rise. Realistic, natural movement.",
-      "scene_prompt": "Warm golden light rising from water in a bronze basin, ancient Greek stone chamber at golden hour, glowing motes, photorealistic cinematic film still, shallow depth of field, film grain, no text, no logos",
-      "_actor": "archimedes_interpretation"
+      "video_idea": "One man only: a fictional artistic interpretation of Archimedes, a Greek scholar in his sixties with silver hair and a short silver beard, wearing an ancient Greek cream wool chiton and a deep terracotta himation over one shoulder (no modern clothing); the same man throughout; no other people; do not restyle or recast him. He never looks into the camera.",
+      "scene_lines": [
+        "Golden hour in the stone bath chamber: from the surface of the brimming bronze basin a warm golden light begins to glow and rise in shimmering motes of light; he stands behind the basin and gazes down at it in quiet awe, the golden glow lighting his face from below; slow upward camera crane, wide-to-medium shot."
+      ],
+      "scene_prompt": "Warm magical golden light rising from water in a bronze basin, ancient Greek stone bath chamber with columns at golden hour, glowing motes, photorealistic cinematic historical film, film grain, no text, no logos"
     },
     "H1_leadership": {
+      "_actor": "actor_1_male_medical_director",
       "mode": "scenes",
       "voice_mode": "none",
-      "target_seconds": 5,
+      "target_seconds": 10,
       "resolution": "1080P",
       "video_mode": "reference",
-      "video_idea": "One male medical director, the same man throughout; no other people; do not restyle or recast him. He walks along a bright modern hospital corridor reviewing performance dashboards on a tablet, then looks up with quiet determination. Calm, confident, realistic natural movement. Slow cinematic camera move.",
-      "scene_prompt": "Bright modern hospital corridor, glass and warm wood, daylight, photorealistic cinematic film still, soft natural light, shallow depth of field, no text, no logos, no brand names",
-      "_actor": "actor_1_male_medical_director"
+      "video_idea": "One man only, a senior medical director in his fifties wearing a tailored navy suit or a white doctor's coat; the same man throughout; no other people; do not restyle or recast him. He never looks into the camera and never speaks to camera.",
+      "scene_lines": [
+        "Shot A: he walks with quiet confidence along a bright modern hospital corridor, reviewing performance dashboards on a tablet; smooth tracking shot alongside him, medium shot.",
+        "Shot B: he stops at a tall window overlooking the hospital campus, lowers the tablet and gazes out with calm determination; slow push-in, medium close-up from the side."
+      ],
+      "scene_prompt": "bright modern hospital corridor with glass and warm wood, premium modern hospital, natural daylight, photorealistic cinematic healthcare brand film, shallow depth of field, no text, no logos, no brand names"
     },
     "H2_accreditation": {
+      "_actor": "actor_2_female_quality_professional",
       "mode": "scenes",
       "voice_mode": "none",
-      "target_seconds": 5,
+      "target_seconds": 10,
       "resolution": "1080P",
       "video_mode": "reference",
-      "video_idea": "One female quality professional, the same woman throughout; no other people; do not restyle or recast her. She conducts a quality and accreditation walk-round in a modern ward, checking items on a clipboard checklist and nodding with approval. Calm, confident, realistic natural movement. Slow cinematic camera move.",
-      "scene_prompt": "Modern clean hospital ward, accreditation review, daylight, photorealistic cinematic film still, soft natural light, shallow depth of field, no text, no logos, no brand names",
-      "_actor": "actor_2_female_quality_professional"
+      "video_idea": "One woman only, a senior healthcare quality professional in a smart blazer; the same woman throughout; no other people; do not restyle or recast her. She never looks into the camera and never speaks to camera.",
+      "scene_lines": [
+        "Shot A: during a quality and accreditation walk-round in a spotless modern ward she checks a medication cart and ticks items on a clipboard checklist with focused care; slow lateral camera move, medium shot.",
+        "Shot B: she reviews a wall-mounted patient-safety board, nods with approval and makes a final tick; gentle push-in, medium close-up from the side."
+      ],
+      "scene_prompt": "spotless modern hospital ward and corridor, premium modern hospital, natural daylight, photorealistic cinematic healthcare brand film, shallow depth of field, no text, no logos, no brand names"
     },
     "H3_strategy": {
+      "_actor": "actor_1_male_medical_director",
       "mode": "scenes",
       "voice_mode": "none",
-      "target_seconds": 5,
+      "target_seconds": 10,
       "resolution": "1080P",
       "video_mode": "reference",
-      "video_idea": "One male medical director, the same man throughout; no other people; do not restyle or recast him. In a glass-walled meeting room he studies a strategy roadmap on a large wall screen and draws a confident arrow with a marker on the glass. Calm, confident, realistic natural movement. Slow cinematic camera move.",
-      "scene_prompt": "Modern hospital boardroom with glass walls and city view, dusk light, photorealistic cinematic film still, soft natural light, shallow depth of field, no text, no logos, no brand names",
-      "_actor": "actor_1_male_medical_director"
+      "video_idea": "One man only, a senior medical director in his fifties wearing a tailored navy suit or a white doctor's coat; the same man throughout; no other people; do not restyle or recast him. He never looks into the camera and never speaks to camera.",
+      "scene_lines": [
+        "Shot A: in a glass-walled boardroom at dusk he studies a strategy roadmap on a large wall screen showing growth charts, hand on chin, thinking; slow arc around him, medium shot.",
+        "Shot B: he steps to the glass wall and draws a confident upward arrow with a marker, then caps the marker with a satisfied look; push-in, medium close-up from the side."
+      ],
+      "scene_prompt": "modern hospital boardroom with glass walls and a city view at dusk, premium modern hospital, natural daylight, photorealistic cinematic healthcare brand film, shallow depth of field, no text, no logos, no brand names"
     },
     "H4_training": {
+      "_actor": "actor_3_female_nurse_educator",
       "mode": "scenes",
       "voice_mode": "none",
-      "target_seconds": 5,
+      "target_seconds": 10,
       "resolution": "1080P",
       "video_mode": "reference",
-      "video_idea": "One female nurse educator, the same woman throughout; no other people; do not restyle or recast her. In a clinical simulation lab she demonstrates a procedure on a training mannequin, speaking calmly as if teaching, then smiles. Calm, confident, realistic natural movement. Slow cinematic camera move.",
-      "scene_prompt": "Modern clinical simulation training lab, mannequin on bed, monitors, photorealistic cinematic film still, soft natural light, shallow depth of field, no text, no logos, no brand names",
-      "_actor": "actor_3_female_nurse_educator"
+      "video_idea": "One woman only, a nurse educator in light-blue scrubs; the same woman throughout; no other people; do not restyle or recast her. She never looks into the camera and never speaks to camera.",
+      "scene_lines": [
+        "Shot A: in a modern clinical simulation lab she demonstrates a procedure on a high-fidelity training mannequin with precise, calm hands, as if teaching a class off-camera; slow dolly, medium shot.",
+        "Shot B: she looks up from the mannequin toward the off-camera trainees with an encouraging smile and gestures to the monitor; medium shot from the side."
+      ],
+      "scene_prompt": "modern clinical simulation and training lab with a mannequin on a bed and patient monitors, premium modern hospital, natural daylight, photorealistic cinematic healthcare brand film, shallow depth of field, no text, no logos, no brand names"
     },
     "H5_turnkey": {
+      "_actor": "actor_2_female_quality_professional",
       "mode": "scenes",
       "voice_mode": "none",
-      "target_seconds": 5,
+      "target_seconds": 10,
       "resolution": "1080P",
       "video_mode": "reference",
-      "video_idea": "One female quality professional, the same woman throughout; no other people; do not restyle or recast her. She walks through a newly completed modern hospital wing, running her hand along a reception desk and looking around with pride. Calm, confident, realistic natural movement. Slow cinematic camera move.",
-      "scene_prompt": "Newly completed modern hospital lobby, pristine, natural light, plants, photorealistic cinematic film still, soft natural light, shallow depth of field, no text, no logos, no brand names",
-      "_actor": "actor_2_female_quality_professional"
+      "video_idea": "One woman only, a senior healthcare quality professional in a smart blazer; the same woman throughout; no other people; do not restyle or recast her. She never looks into the camera and never speaks to camera.",
+      "scene_lines": [
+        "Shot A: she walks into a brand-new, just-completed hospital lobby, pristine and filled with daylight, and looks around with pride; wide-to-medium tracking shot from behind and to the side.",
+        "Shot B: she runs her hand along the new reception desk and looks up at the high atrium ceiling, smiling quietly; slow upward camera tilt, medium shot."
+      ],
+      "scene_prompt": "brand-new completed modern hospital lobby with a high glass atrium, plants and warm daylight, premium modern hospital, natural daylight, photorealistic cinematic healthcare brand film, shallow depth of field, no text, no logos, no brand names"
+    },
+    "H6_operations": {
+      "_actor": "actor_3_female_nurse_educator",
+      "mode": "scenes",
+      "voice_mode": "none",
+      "target_seconds": 10,
+      "resolution": "1080P",
+      "video_mode": "reference",
+      "video_idea": "One woman only, a nurse educator in light-blue scrubs; the same woman throughout; no other people; do not restyle or recast her. She never looks into the camera and never speaks to camera.",
+      "scene_lines": [
+        "Shot A: at a modern nurses' station she reviews patient-flow information on a large touchscreen and coordinates with focused efficiency; slow lateral move, medium shot.",
+        "Shot B: she walks briskly and purposefully down a calm, well-organised ward corridor carrying a tablet; smooth tracking shot, medium-wide."
+      ],
+      "scene_prompt": "modern hospital nurses' station and ward corridor, premium modern hospital, natural daylight, photorealistic cinematic healthcare brand film, shallow depth of field, no text, no logos, no brand names"
+    },
+    "H7_orgdev": {
+      "_actor": "actor_2_female_quality_professional",
+      "mode": "scenes",
+      "voice_mode": "none",
+      "target_seconds": 10,
+      "resolution": "1080P",
+      "video_mode": "reference",
+      "video_idea": "One woman only, a senior healthcare quality professional in a smart blazer; the same woman throughout; no other people; do not restyle or recast her. She never looks into the camera and never speaks to camera.",
+      "scene_lines": [
+        "Shot A: in a bright training room she stands beside a whiteboard showing an organisational structure chart and explains it with open, confident gestures toward an off-camera team; slow arc, medium shot.",
+        "Shot B: she places colourful sticky notes onto the chart, steps back and smiles with satisfaction; medium shot from the side."
+      ],
+      "scene_prompt": "bright modern corporate training room inside a hospital, premium modern hospital, natural daylight, photorealistic cinematic healthcare brand film, shallow depth of field, no text, no logos, no brand names"
+    },
+    "H8_business": {
+      "_actor": "actor_1_male_medical_director",
+      "mode": "scenes",
+      "voice_mode": "none",
+      "target_seconds": 10,
+      "resolution": "1080P",
+      "video_mode": "reference",
+      "video_idea": "One man only, a senior medical director in his fifties wearing a tailored navy suit or a white doctor's coat; the same man throughout; no other people; do not restyle or recast him. He never looks into the camera and never speaks to camera.",
+      "scene_lines": [
+        "Shot A: he signs a partnership agreement at a polished conference table with a fountain pen, then closes the leather folder; slow push-in, medium shot from the side.",
+        "Shot B: he stands, buttons his jacket and walks toward floor-to-ceiling windows with a city skyline at golden hour, looking ahead with ambition; tracking shot, medium-wide."
+      ],
+      "scene_prompt": "elegant modern executive conference room with a city skyline at golden hour, premium modern hospital, natural daylight, photorealistic cinematic healthcare brand film, shallow depth of field, no text, no logos, no brand names"
     }
   },
   "eureka_line": {
