@@ -38,6 +38,81 @@ def _plate_frame_v2(name, t):
 
 
 M.plate_frame = _plate_frame_v2
+
+# ------------------------------------------------------------------ 1  THE SHOUT: a cinematic pull-back from his face to
+# his raised arms and the flying water; the frame edges dissolve into warm darkness and golden rays.
+A4_KEYS = [(0, 0.17, 1.0), (1.0, 0.13, 1.0), (2.6, 0.12, 0.95)]
+
+
+def _a4_window(v):
+    ts = [k[0] for k in A4_KEYS]
+    yf = float(np.interp(v, ts, [k[1] for k in A4_KEYS]))
+    wf = float(np.interp(v, ts, [k[2] for k in A4_KEYS]))
+    cw = int(720 * wf) // 2 * 2
+    ch = int(cw * 9 / 16) // 2 * 2
+    y0 = yf * 1264
+    return 1920 / cw, (360.0, y0 + ch / 2)
+
+
+@functools.lru_cache(maxsize=1)
+def _feather(w=720, h=1264, e=70):
+    x = np.minimum(np.arange(w), np.arange(w)[::-1]) / e
+    y = np.minimum(np.arange(h), np.arange(h)[::-1]) / e
+    return np.clip(np.minimum(y[:, None], x[None, :]), 0, 1) ** 1.5
+
+
+def shout(cv, t):
+    v = t - tl.EUREKA_AT
+    full = plate('A4_full')
+    p = ease_io(seg(v, 0.12, 1.05))
+    s0, c0 = _a4_window(v)
+    s1, c1 = 1080 / (0.68 * 1264), (360.0, 0.38 * 1264)
+    sc = math.exp(lerp(math.log(s0), math.log(s1), p))
+    cx, cy = lerp(c0[0], c1[0], p), lerp(c0[1], c1[1], p)
+    # warm darkness + rays behind the frame
+    cv[:] = np.array([0.05, 0.035, 0.02], np.float32)
+    ST.add(cv, R.rays(W / 2, 120, t, n=22, speed=0.08, reach=1300), GOLD, 0.25 * p)
+    fr = np.asarray(full[int(np.clip(v * 24, 0, len(full) - 1))], np.float32) / 255
+    rgba = np.dstack([fr, _feather()]).astype(np.float32)
+    img = Image.fromarray((rgba * 255).astype(np.uint8), 'RGBA')
+    box = (cx - 960 / sc, cy - 540 / sc, cx + 960 / sc, cy + 540 / sc)
+    pad = 900
+    big = Image.new('RGBA', (720 + 2 * pad, 1264 + 2 * pad), (0, 0, 0, 0))
+    big.alpha_composite(img, (pad, pad))
+    lay = np.asarray(big.resize((W, H), Image.LANCZOS, box=(box[0] + pad, box[1] + pad, box[2] + pad, box[3] + pad)), np.float32) / 255
+    a = lay[..., 3:4]
+    cv[:] = cv * (1 - a) + grade_warm(lay[..., :3]) * a
+    k = 1 - seg(v, 0.04, 0.12)           # before the pull-back starts, the AI-upscaled window plate (identical framing)
+    if k > 0:
+        sr = _plate_frame('arch', t)
+        if sr is not None:
+            cv[:] = cv * (1 - k) + grade_warm(sr) * k
+    # golden light gathering toward the burst
+    g = seg(v, 0.6, tl.EUREKA_CUT)
+    PF.glow(cv, W / 2, 330, 300 + 900 * g, GOLD, 0.6 * g ** 2)
+    f = seg(v, tl.EUREKA_CUT - 0.22, tl.EUREKA_CUT)     # the flying water ignites into the golden burst
+    cv[:] = cv * (1 - 0.6 * f) + WARM * 0.8 * f
+    for k in range(30):
+        rng = np.random.default_rng(100 + k)
+        ang, sp = rng.uniform(0, 2 * math.pi), rng.uniform(300, 900)
+        d = (v - 0.4) * sp
+        if d > 0:
+            R.splat(cv, W / 2 + d * math.cos(ang), 360 + d * 0.7 * math.sin(ang), rng.uniform(2, 4), 1.2 * seg(v, 0.4, 0.8))
+    return True
+
+
+_s1 = M.s1_discovery
+
+
+def s1_v2(cv, t):
+    if plate('A4_full') is not None and tl.EUREKA_AT <= t < tl.T_GOLD:
+        return shout(cv, t)
+    corner = _s1(cv, t)
+    f = 1 - seg(t, tl.T_GOLD, tl.T_GOLD + 0.7)            # the burst clears to reveal the golden water
+    if tl.T_GOLD <= t and f > 0:
+        cv[:] = cv * (1 - 0.6 * f) + WARM * 0.8 * f
+        PF.glow(cv, W / 2, H * 0.55, 1200, GOLD, 0.8 * f)
+    return corner
 BUILD = M.BUILD
 LOGOS = os.path.join(M.ROOT, 'assets_logos')
 STEEL = np.array([0.45, 0.62, 0.85], np.float32)
@@ -352,7 +427,7 @@ def s8_finale(cv, t):
 def frame(t):
     cv = np.zeros((H, W, 3), np.float32)
     if t < tl.T_BRIDGE:
-        corner = M.s1_discovery(cv, t)
+        corner = s1_v2(cv, t)
     elif t < tl.T_WHO:
         corner = s2_bridge(cv, t)
     elif t < tl.T_WHAT:
