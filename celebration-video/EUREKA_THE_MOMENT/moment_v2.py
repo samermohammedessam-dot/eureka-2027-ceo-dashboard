@@ -351,15 +351,13 @@ def wall_panels():
 
 
 def wall_times():
-    """(panel starts..., network start, end)."""
+    """(panel starts, network start, wall end, panel duration) — all from tl, so the score stays in sync."""
     t = tl.T_WALL + tl.WALL_HEAD
-    n = max(1, len(wall_panels()))
-    dur = float(np.clip((tl.T_FUTURE - t - 6.5) / n, 3.6, 6.0))   # the full network always keeps about 6.5 s
     starts = []
     for _ in wall_panels():
         starts.append(t)
-        t += dur
-    return starts, t, tl.T_FUTURE, dur
+        t += tl.WALL_PANEL
+    return starts, t, tl.T_FUTURE, tl.WALL_PANEL
 
 
 def s7_wall(cv, t):
@@ -388,11 +386,10 @@ def s7_wall(cv, t):
             card = wall_card(path, 400, 270)
             composite(cv, card, x, y + 24 * (1 - ease_out(qq)), 0.96 + 0.04 * ease_out(qq), ease_io(qq) * (1 - out), glow=0.1,
                       shine=seg(v, 0.5 + 0.32 * j, 1.3 + 0.32 * j) if 0.5 + 0.32 * j < v < 1.3 + 0.32 * j else None)
-    # the full network: every uploaded logo + the GAHAR institutions (each once), one balanced wide grid
-    if t >= t_net - 0.1:
+    # all uploaded logos together (only when they fill more than one panel) — each institution exactly once
+    if tl.N_LOGOS > 5 and t >= t_net - 0.1:
         v = t - t_net
-        new, gahar = wall_logos()
-        allx = new + gahar
+        allx, _ = wall_logos()
         n = len(allx)
         cols = 6 if n > 15 else 5
         rows = (n + cols - 1) // cols
@@ -403,24 +400,57 @@ def s7_wall(cv, t):
         for j, (name, path) in enumerate(allx):
             r, c = divmod(j, cols)
             inrow = min(cols, n - r * cols)
-            x = W / 2 + (c - (inrow - 1) / 2) * gx
-            y = y0 + r * gy
             qq = seg(v, 0.1 + 0.07 * j, 0.5 + 0.07 * j)
-            composite(cv, wall_card(path, cw, ch), x, y, 0.9 + 0.1 * ease_out(qq), ease_io(qq) * (1 - out), glow=0.08)
-        PF.glow(cv, W / 2, 560, 900, WARM, 0.12 * seg(v, 1.4, 2.6) * (1 - out))
+            composite(cv, wall_card(path, cw, ch), W / 2 + (c - (inrow - 1) / 2) * gx, y0 + r * gy,
+                      0.9 + 0.1 * ease_out(qq), ease_io(qq) * (1 - out), glow=0.08)
     return False          # the heading owns the top of the frame here
 
 
 # ------------------------------------------------------------------ 8  FINALE (15 s, final musical peak on the line)
+@functools.lru_cache(maxsize=1)
+def unique_cards():
+    new, gahar = wall_logos()
+    return [wall_card(path, 300, 160) for _, path in gahar + new]
+
+
 def s8_finale(cv, t):
-    u = t - tl.T_FUTURE
-    if u < 9.0:
-        M.s7_future(cv, M.T_FUTURE + u)
-    else:   # hold the final composition, alive: slow rays and shimmer
-        M.s7_future(cv, M.T_FUTURE + 8.95)
-        ST.add(cv, R.rays(W / 2, 420, t, n=20, speed=0.04, reach=1100), GOLD, 0.06)
+    """Light travels through every institution once, converges, and becomes the Eureka logo; final peak on the line."""
+    u = min(t - tl.T_FUTURE, 8.95)
+    cv[:] = NAVY * 0.9
+    cards = unique_cards()
+    n = len(cards)
+    rows = [cards[:(n + 1) // 2], cards[(n + 1) // 2:]] if n > 10 else [cards]
+    travel = seg(u, 0.2, 3.4)
+    lx = lerp(-150, W + 150, ease_io(travel))
+    out = seg(u, 3.4, 4.4)
+    for r, row in enumerate(rows):
+        m = len(row)
+        span = min(1640, 175 * (m - 1))
+        ybase = 560 if len(rows) == 1 else (450 if r == 0 else 690)
+        for j, card in enumerate(row):
+            x0 = W / 2 - span / 2 + (span * j / max(1, m - 1))
+            y0 = ybase - 60 * math.sin(math.pi * j / max(1, m - 1))
+            lit = math.exp(-((x0 - lx) / 140) ** 2)
+            seen = seg(lx, x0 - 120, x0 + 60)
+            x, y = lerp(x0, W / 2, ease_io(out)), lerp(y0, 560, ease_io(out))
+            composite(cv, card, x, y, 0.5 * (1 + 0.12 * lit) * (1 - 0.5 * out), (0.35 + 0.65 * seen) * (1 - out),
+                      glow=0.1 + 0.15 * lit)
+            PF.glow(cv, x, y + 60, 110, GOLD, 0.18 * lit * (1 - out))
+    if 0 < travel < 1:
+        ly = 640 if len(rows) == 1 else 570
+        PF.glow(cv, lx, ly, 120, GOLD, 0.35)
+        for k in range(14):
+            R.splat(cv, lx - k * 26, ly + 4 * math.sin(k + t * 3), 3.2 - k * 0.18, 1.3 * (1 - k / 14))
+    PF.glow(cv, W / 2, 520, 160 + 600 * out, GOLD, 1.1 * out * (1 - 0.6 * seg(u, 4.6, 5.4)))
+    ST.add(cv, R.rays(W / 2, 420, t, n=20, speed=0.04, reach=1100), GOLD, 0.2 * seg(u, 4.0, 5.0) + 0.06 * seg(t - tl.T_FUTURE, 9, 10))
+    q = seg(u, 4.2, 5.2)
+    composite(cv, PF.eureka_layer(600, 0.55), W / 2, 400, lerp(0.9, 1.0, ease_out(q)), ease_io(q), glow=0,
+              shine=seg(u, 5.0, 6.2) if 5.0 < u < 6.2 else None)
+    q3 = seg(u, 6.2, 7.0)
+    text(cv, 'FROM INSIGHT TO IMPACT.', W / 2, 820, 78, 'cinzel', 'ivory', ease_io(q3), 8, 0.6,
+         shine=seg(u, 7.0, 8.2) if 7.0 < u < 8.2 else None)
     cv *= 1 - seg(t, DUR - 1.4, DUR)
-    return u < 4.0
+    return t - tl.T_FUTURE < 4.0
 
 
 # ------------------------------------------------------------------ frame + output

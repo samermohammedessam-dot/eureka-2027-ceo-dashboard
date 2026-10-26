@@ -10,11 +10,21 @@ No narration: the only voice is the single synchronized "EUREKA!".
   107-124  TRUSTED BY HEALTHCARE LEADERS   logo panels from the approved upload, then the full network
   124-139  FINALE         light through the institutions -> Eureka logo -> FROM INSIGHT TO IMPACT
 """
-DUR = 139.0
+import json as _json
+import os as _os
+
+_LOGOS = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))), 'assets_logos', 'logos.json')
+N_LOGOS = len(_json.load(open(_LOGOS))['logos']) if _os.path.exists(_LOGOS) else 0
+N_PANELS = max(1, (N_LOGOS + 4) // 5)
 EUREKA_AT = 13.10                  # the voiced insert starts here (its own lip-synced audio)
 EUREKA_CUT = 1.45                  # only the first, strongest shout
 T_GOLD = EUREKA_AT + EUREKA_CUT    # golden light bursts from the water
-T_BRIDGE, T_WHO, T_WHAT, T_IMPACT, T_PEOPLE, T_WALL, T_FUTURE = 17.0, 30.0, 40.0, 65.0, 98.0, 107.0, 124.0
+T_BRIDGE, T_WHO, T_WHAT, T_IMPACT, T_PEOPLE, T_WALL = 17.0, 30.0, 40.0, 65.0, 98.0, 107.0
+WALL_HEAD = 1.6                    # heading before the first logo panel
+WALL_PANEL = 5.4 if N_PANELS == 1 else 4.6                      # each panel of up to five large logos
+WALL_NET = 5.5 if N_LOGOS > 5 else 0.6                         # all uploaded logos together (only when more than one panel)
+T_FUTURE = T_WALL + WALL_HEAD + N_PANELS * WALL_PANEL + WALL_NET
+DUR = T_FUTURE + 15.0
 
 INSIGHT = T_BRIDGE + 5.4           # the leader's moment of insight (match to Archimedes)
 LOGO_REVEAL = T_BRIDGE + 9.6
@@ -24,8 +34,6 @@ IMP_T0 = T_IMPACT + 2.0
 IMP_DURS = [3.6, 6.2, 3.6, 3.4, 3.4, 3.6, 3.6, 3.6]   # 10 GAHAR achievements: the long one
 LAND = 1.65                        # inside a counter: the moment the number lands
 
-WALL_HEAD = 1.6                    # heading before the first logo panel
-WALL_PANEL = 4.2                   # each panel of five large logos
 FIN_LOGO = T_FUTURE + 5.2          # Eureka logo lands
 FIN_LINE = T_FUTURE + 7.2          # "FROM INSIGHT TO IMPACT." — the final musical peak
 
